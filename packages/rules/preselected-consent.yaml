@@ -1,0 +1,15 @@
+id: preselected-consent
+version: 1
+severity: warning
+description: 선택 동의 항목이 기본 체크되어 있는지 확인합니다.
+selector:
+  element: input
+  attributes:
+    type: checkbox
+    checked: true
+conditions:
+  label_contains_any:
+    - 선택
+    - 마케팅
+    - 광고
+message: 선택 동의가 미리 체크되어 있습니다. 필요한 동의인지 확인해 보세요.

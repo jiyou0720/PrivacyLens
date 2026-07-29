@@ -1,0 +1,7 @@
+id: misleading-required-label
+version: 1
+severity: info
+description: 선택 항목이 필수 영역에 섞여 있는지 검토합니다.
+conditions:
+  optional_label_near_required_group: true
+message: 선택 항목이 필수 항목과 함께 표시되어 있습니다. 각각의 선택 여부를 확인해 보세요.
