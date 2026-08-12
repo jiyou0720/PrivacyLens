@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "lint": "tsc --noEmit",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@privacylens/contracts": "workspace:*",
@@ -20,6 +21,8 @@
     "@types/chrome": "^0.0.287",
     "@types/react": "^19.0.3",
     "@types/react-dom": "^19.0.2",
-    "typescript": "^5.7.2"
+    "jsdom": "^26.0.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
   }
 }

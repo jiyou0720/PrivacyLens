@@ -19,6 +19,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      - run: pnpm --filter @privacylens/extension lint
+      - run: pnpm --filter @privacylens/extension test
       - run: pnpm build
 
   api:
