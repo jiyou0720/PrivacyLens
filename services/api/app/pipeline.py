@@ -5,11 +5,14 @@ from .models import (
     ConsentTextAnalysis,
     ConsentTextAnalysisRequest,
     Necessity,
-    RuleSeverity,
+)
+from .rag.retriever import Retriever
+from .rag.risk_engine import (
+    build_risk_summary,
+    merge_findings,
 )
 from .rules import evaluate_rules
 from .settings import Settings
-from .rag.retriever import Retriever
 
 
 def _normalize(value: str) -> str:
@@ -22,25 +25,16 @@ async def analyze_consent_text(
     settings: Settings,
     retriever: Retriever,
 ) -> ConsentTextAnalysis:
-    """
-    동의서 텍스트를 분석합니다.
 
-    1. RAG를 통해 관련 법률/가이드 문서를 검색
-    2. 검색된 문서를 LLM 분석 컨텍스트로 전달
-    3. LLM이 개인정보 수집 항목 및 분석 결과 추출
-    4. LLM이 제시한 근거가 실제 원문에 존재하는지 검증
-    5. Rule 기반 위험 요소 평가
-    """
+    # ============================================================
+    # 1. RAG
+    # ============================================================
 
-    # 1. 분석 대상 문서와 서비스 기능을 기반으로
-    # 관련 법률/가이드/정책 문서 검색
     query = f"""
-서비스명: {request.service_name}
-
 서비스 기능:
-{request.service_function}
+{request.service_function or "제공되지 않음"}
 
-분석할 개인정보 동의서:
+분석 대상 동의서:
 {request.document_text}
 """
 
@@ -49,66 +43,107 @@ async def analyze_consent_text(
         top_k=3,
     )
 
-    # 2. 검색된 문서를 LLM에 전달하기 위한 Context 생성
-    rag_context = "\n\n".join(
+    rag_content = "\n\n".join(
         [
             f"[참고 문서 {index + 1}]\n{document}"
-            for index, document in enumerate(retrieved_documents)
+            for index, document in enumerate(
+                retrieved_documents
+            )
         ]
     )
 
-    # 검색 결과가 없을 경우
-    if not rag_context:
-        rag_context = (
-            "관련 참고 문서를 찾지 못했습니다. "
-            "분석 대상 원문에 명시된 내용만 근거로 판단하세요."
-        )
+    # ============================================================
+    # 2. LLM 분석
+    # ============================================================
 
-    # 3. RAG Context와 함께 LLM 분석
     extracted = await provider.extract(
         document_text=request.document_text,
         service_function=request.service_function,
-        rag_context=rag_context,
+        rag_content=rag_content or None,
     )
 
-    # 4. LLM이 제시한 evidence_text가
-    # 실제 사용자가 제공한 원문에 존재하는지 검증
-    source = _normalize(request.document_text)
+    # ============================================================
+    # 3. Evidence 검증
+    # ============================================================
+
+    source = _normalize(
+        request.document_text
+    )
 
     unverified: list[str] = []
 
     for item in extracted.collected_items:
-        if _normalize(item.evidence_text) not in source:
-            unverified.append(item.evidence_text)
+
+        evidence = _normalize(
+            item.evidence_text
+        )
+
+        if evidence not in source:
+
+            unverified.append(
+                item.evidence_text
+            )
 
             item.confidence = 0
-            item.necessity = Necessity.CONTEXT_REQUIRED
+
+            item.necessity = (
+                Necessity.CONTEXT_REQUIRED
+            )
+
             item.reason = (
                 "제시된 근거 문구를 원문에서 확인할 수 없어 "
                 "사람의 검토가 필요합니다."
             )
 
-    # 5. 기존 Rule 기반 분석
-    findings = evaluate_rules(extracted)
+    # ============================================================
+    # 4. Rule Engine
+    # ============================================================
 
-    # 6. 사람이 검토해야 하는지 판단
-    needs_review = (
-        extracted.requires_human_review
-        or bool(unverified)
-        or any(
-            finding.severity == RuleSeverity.HIGH
-            for finding in findings
-        )
+    rule_findings = evaluate_rules(
+        extracted
     )
 
-    # 7. 최종 결과 반환
+    # ============================================================
+    # 5. 결과 병합
+    # ============================================================
+
+    findings = merge_findings(
+        rule_findings
+    )
+
+    # ============================================================
+    # 6. Risk Score + Risk Level + Human Review
+    # ============================================================
+
+    risk_summary = build_risk_summary(
+        findings=findings,
+        extracted=extracted,
+        unverified_evidence=unverified,
+    )
+
+    # ============================================================
+    # 7. 최종 결과
+    # ============================================================
+
     return ConsentTextAnalysis(
         service_name=request.service_name,
         model_name=provider.model_name,
         prompt_version=settings.prompt_version,
         rule_version=settings.rule_version,
+
         extracted=extracted,
-        rule_findings=findings,
+
+        # 최종 병합 결과
+        findings=findings,
+
+        # 현재 Rule Engine 원본 결과
+        rule_findings=rule_findings,
+
         unverified_evidence=unverified,
-        requires_human_review=needs_review,
+
+        risk_summary=risk_summary,
+
+        requires_human_review=(
+            risk_summary.requires_human_review
+        ),
     )

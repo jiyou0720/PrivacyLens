@@ -76,12 +76,48 @@ class RuleSeverity(StrEnum):
     HIGH = "high"
 
 
+class RiskLevel(StrEnum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+
 class RuleFinding(BaseModel):
     rule_id: str
+
+    # 기존 Rule Engine의 심각도
     severity: RuleSeverity
+
+    # 사용자에게 보여줄 분류
+    category: str
+
     title: str
+
+    # 위험 발생 이유
     reason: str
+
+    # 반드시 원문에서 가져온 근거
     evidence_text: str | None = None
+
+    # 영향을 받는 개인정보 항목
+    affected_items: list[str] = Field(default_factory=list)
+
+    # 개선 방법
+    recommendation: str
+
+    # 제품용 위험 점수
+    score: int = Field(default=0, ge=0, le=100)
+
+    # 해당 Finding에 대한 신뢰도
+    confidence: float = Field(default=1.0, ge=0, le=1)
+
+
+class RiskSummary(BaseModel):
+    score: int = Field(ge=0, le=100)
+    level: RiskLevel
+    requires_human_review: bool
+    explanation: str
 
 
 class ConsentTextAnalysisRequest(BaseModel):
@@ -95,7 +131,17 @@ class ConsentTextAnalysis(BaseModel):
     model_name: str
     prompt_version: str
     rule_version: str
+
     extracted: ExtractedConsent
+
+    # 최종적으로 병합된 Finding
+    findings: list[RuleFinding]
+
+    # 기존 필드도 당장은 유지
     rule_findings: list[RuleFinding]
+
     unverified_evidence: list[str]
+
+    risk_summary: RiskSummary
+
     requires_human_review: bool
