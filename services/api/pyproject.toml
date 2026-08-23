@@ -1,12 +1,18 @@
 [project]
 name = "privacylens-api"
-version = "0.1.0"
-description = "Evidence-based privacy policy analysis API"
+version = "0.2.0"
+description = "Evidence-based privacy consent analysis API"
 requires-python = ">=3.12"
-dependencies = ["fastapi>=0.115.6,<1", "pydantic>=2.10.4,<3", "uvicorn[standard]>=0.34,<1"]
+dependencies = [
+  "fastapi>=0.115.6,<1",
+  "httpx>=0.28.1,<1",
+  "pydantic>=2.10.4,<3",
+  "pydantic-settings>=2.7,<3",
+  "uvicorn[standard]>=0.34,<1",
+]
 
 [project.optional-dependencies]
-dev = ["httpx>=0.28.1,<1", "pytest>=8.3.4,<9", "ruff>=0.8.4,<1"]
+dev = ["pytest>=8.3.4,<9", "ruff>=0.8.4,<1"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
