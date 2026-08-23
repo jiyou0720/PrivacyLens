@@ -135,6 +135,8 @@ async def analyze_text(
         ValueError,
     ) as exc:
 
+        print(f"[ERROR] {type(exc).__name__}: {exc}")
+
         raise HTTPException(
             status_code=503,
             detail="AI 분석 결과를 가져오거나 검증하지 못했습니다.",

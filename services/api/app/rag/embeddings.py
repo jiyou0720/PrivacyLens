@@ -16,12 +16,15 @@ class OllamaEmbeddingProvider:
         )
 
     async def embed(self, text: str) -> np.ndarray:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(
+            timeout=120.0
+        ) as client:
+
             response = await client.post(
-                f"{self.base_url}/api/embeddings",
+                f"{self.base_url}/api/embed",
                 json={
                     "model": self.model,
-                    "prompt": text,
+                    "input": text,
                 },
             )
 
@@ -29,7 +32,14 @@ class OllamaEmbeddingProvider:
 
             data = response.json()
 
+        embeddings = data["embeddings"]
+
+        if not embeddings:
+            raise ValueError(
+                "Ollama에서 embedding 결과를 받지 못했습니다."
+            )
+
         return np.array(
-            data["embedding"],
+            embeddings[0],
             dtype=np.float32,
         )

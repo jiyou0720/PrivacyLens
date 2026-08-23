@@ -8,6 +8,13 @@ AMBIGUOUS_RETENTION = (
     "별도 고지",
 )
 
+UNIQUE_IDENTIFIER_KEYWORDS = (
+    "주민등록번호",
+    "여권번호",
+    "운전면허번호",
+    "외국인등록번호",
+)
+
 RULE_VERSION = "consent-rules-v2"
 
 
@@ -127,6 +134,7 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
     # ============================================================
 
     for item in data.collected_items:
+        normalized = item.original_name.replace(" ", "")
 
         if item.sensitive:
             add_finding(
@@ -148,15 +156,23 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
                 confidence=item.confidence,
             )
 
-        if item.unique_identifier:
+        is_unique_identifier = (
+            item.unique_identifier
+            or any(
+                keyword in normalized
+                for keyword in UNIQUE_IDENTIFIER_KEYWORDS
+            )
+        )
+
+        if is_unique_identifier:
             add_finding(
-                rule_id="HIGH_RISK_IDENTIFIER",
+                rule_id="UNIQUE_IDENTIFIER_REVIEW",
                 severity=RuleSeverity.HIGH,
                 category="고유식별정보",
-                title="고위험 식별정보 수집 검토 필요",
+                title="고유식별정보 수집 검토 필요",
                 reason=(
-                    f"{item.original_name}이 고유식별정보로 분류되어 "
-                    "수집의 필요성과 적절한 처리 근거에 대한 검토가 필요합니다."
+                    f"{item.original_name}은 고유식별정보에 해당할 가능성이 있어 "
+                    "수집 근거와 별도 처리 여부를 검토해야 합니다."
                 ),
                 recommendation=(
                     "해당 식별정보의 수집 필요성과 처리 근거를 확인하고 "
