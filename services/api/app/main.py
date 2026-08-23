@@ -10,6 +10,8 @@ from .llm import OllamaProvider
 from .models import AnalyzeRequest, ConsentTextAnalysis, ConsentTextAnalysisRequest, PolicyAnalysis
 from .pipeline import analyze_consent_text
 from .settings import Settings, get_settings
+from .rag.embeddings import OllamaEmbeddingProvider
+from .rag.retriever import Retriever
 
 app = FastAPI(
     title="PrivacyLens Analysis API",
@@ -50,4 +52,62 @@ async def analyze_text(
         raise HTTPException(
             status_code=503,
             detail="Ollama 분석 결과를 가져오거나 검증하지 못했습니다.",
+        ) from exc
+
+def get_retriever(
+    settings: Annotated[
+        Settings,
+        Depends(get_settings)
+    ],
+) -> Retriever:
+
+    embedding_provider = OllamaEmbeddingProvider(
+        settings
+    )
+
+    return Retriever(
+        embedding_provider
+    )
+
+@app.post(
+    "/api/v1/analyses/text",
+    response_model=ConsentTextAnalysis,
+)
+async def analyze_text(
+    request: ConsentTextAnalysisRequest,
+    settings: Annotated[
+        Settings,
+        Depends(get_settings)
+    ],
+    provider: Annotated[
+        OllamaProvider,
+        Depends(get_llm_provider)
+    ],
+    retriever: Annotated[
+        Retriever,
+        Depends(get_retriever)
+    ],
+) -> ConsentTextAnalysis:
+
+    try:
+
+        await retriever.initialize()
+
+        return await analyze_consent_text(
+            request,
+            provider,
+            settings,
+            retriever,
+        )
+
+    except (
+        httpx.HTTPError,
+        ValidationError,
+        KeyError,
+        ValueError,
+    ) as exc:
+
+        raise HTTPException(
+            status_code=503,
+            detail="AI 분석 결과를 가져오거나 검증하지 못했습니다.",
         ) from exc
