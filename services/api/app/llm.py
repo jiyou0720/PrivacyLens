@@ -6,7 +6,6 @@ import httpx
 from .models import ExtractedConsent
 from .settings import Settings
 
-
 SYSTEM_PROMPT = """당신은 개인정보 동의서 구조화 분석기입니다.
 
 [핵심 원칙]

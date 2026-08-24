@@ -1,6 +1,5 @@
 from .models import ExtractedConsent, RuleFinding, RuleSeverity
 
-
 AMBIGUOUS_RETENTION = (
     "필요시",
     "목적 달성 시",

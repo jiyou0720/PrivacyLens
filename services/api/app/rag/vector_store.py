@@ -33,7 +33,7 @@ class VectorStore:
             dtype=np.float32,
         )
 
-        distances, indices = self.index.search(
+        indices = self.index.search(
             query,
             top_k,
         )

@@ -14,10 +14,9 @@ from .models import (
     PolicyAnalysis,
 )
 from .pipeline import analyze_consent_text
-from .settings import Settings, get_settings
 from .rag.embeddings import OllamaEmbeddingProvider
 from .rag.retriever import Retriever
-
+from .settings import Settings, get_settings
 
 app = FastAPI(
     title="PrivacyLens Analysis API",
