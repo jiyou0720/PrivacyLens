@@ -1,7 +1,7 @@
 def chunk_text(
     text: str,
-    chunk_size: int = 500,
-    overlap: int = 100,
+    chunk_size: int = 8000,
+    overlap: int = 400,
 ) -> list[str]:
 
     chunks = []
