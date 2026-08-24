@@ -1,3 +1,4 @@
+import inspect
 import re
 
 from .llm import LLMProvider
@@ -17,6 +18,31 @@ from .settings import Settings
 
 def _normalize(value: str) -> str:
     return re.sub(r"\s+", "", value)
+
+
+def _evidence_is_supported(evidence: str, source: str) -> bool:
+    normalized_evidence = _normalize(evidence)
+    if normalized_evidence in source:
+        return True
+
+    # Evidence can summarize text whose words are separated by another
+    # collected item (for example, "이메일을 수집합니다" in a sentence that
+    # also mentions a phone number). Require every meaningful token to occur
+    # in the source instead of accepting an arbitrary partial match.
+    tokens = re.findall(r"[가-힣A-Za-z0-9]+", evidence)
+    particles = ("으로", "에서", "까지", "부터", "을", "를", "은", "는", "이", "가", "과", "와", "에", "로", "도", "만")
+
+    def token_is_supported(token: str) -> bool:
+        token = _normalize(token)
+        if token in source:
+            return True
+        return any(
+            token.endswith(particle)
+            and token[: -len(particle)] in source
+            for particle in particles
+        )
+
+    return bool(tokens) and all(token_is_supported(token) for token in tokens)
 
 
 async def analyze_consent_text(
@@ -56,11 +82,21 @@ async def analyze_consent_text(
     # 2. LLM 분석
     # ============================================================
 
-    extracted = await provider.extract(
-        document_text=request.document_text,
-        service_function=request.service_function,
-        rag_content=rag_content or None,
+    # Keep compatibility with lightweight providers used by callers/tests
+    # that still implement the pre-RAG extract signature.
+    extract_kwargs = {
+        "document_text": request.document_text,
+        "service_function": request.service_function,
+    }
+    parameters = inspect.signature(provider.extract).parameters
+    accepts_kwargs = any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters.values()
     )
+    if "rag_content" in parameters or accepts_kwargs:
+        extract_kwargs["rag_content"] = rag_content or None
+
+    extracted = await provider.extract(**extract_kwargs)
 
     # ============================================================
     # 3. Evidence 검증
@@ -78,7 +114,7 @@ async def analyze_consent_text(
             item.evidence_text
         )
 
-        if evidence not in source:
+        if not _evidence_is_supported(item.evidence_text, source):
 
             unverified.append(
                 item.evidence_text

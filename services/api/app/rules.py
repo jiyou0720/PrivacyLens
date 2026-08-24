@@ -137,7 +137,7 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
 
         if item.sensitive:
             add_finding(
-                rule_id="SENSITIVE_DATA_NO_SEPARATE_CONSENT",
+                rule_id="SPECIAL_DATA_REVIEW",
                 severity=RuleSeverity.HIGH,
                 category="민감정보",
                 title="민감정보 수집 검토 필요",

@@ -125,7 +125,7 @@ def check_human_review(
         # 고위험 개인정보 관련 결과
         if finding.rule_id in {
             "HIGH_RISK_IDENTIFIER",
-            "SENSITIVE_DATA_NO_SEPARATE_CONSENT",
+            "SPECIAL_DATA_REVIEW",
         }:
             return True
 
