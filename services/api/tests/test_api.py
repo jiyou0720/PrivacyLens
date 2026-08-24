@@ -3,7 +3,6 @@ from fastapi.testclient import TestClient
 from app.main import app, get_llm_provider
 from app.models import ExtractedConsent, Necessity, PersonalDataItem
 
-
 client = TestClient(app)
 
 
