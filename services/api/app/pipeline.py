@@ -110,10 +110,6 @@ async def analyze_consent_text(
 
     for item in extracted.collected_items:
 
-        evidence = _normalize(
-            item.evidence_text
-        )
-
         if not _evidence_is_supported(item.evidence_text, source):
 
             unverified.append(
