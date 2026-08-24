@@ -1,7 +1,16 @@
 from fastapi.testclient import TestClient
 
-from app.main import app, get_llm_provider
-from app.models import ExtractedConsent, Necessity, PersonalDataItem
+from app.main import (
+    app,
+    get_llm_provider,
+    get_retriever,
+)
+from app.models import (
+    ExtractedConsent,
+    Necessity,
+    PersonalDataItem,
+)
+
 
 client = TestClient(app)
 
@@ -27,10 +36,28 @@ class FakeProvider:
                     mandatory=True,
                     necessity=Necessity.NECESSARY,
                     reason="계정 식별",
-                    evidence_text="이메일과 휴대전화번호를 수집",
+                    evidence_text="이메일을 수집합니다.",
                 )
             ],
         )
+
+
+class FakeRetriever:
+    """
+    CI에서는 Ollama를 사용하지 않는다.
+    """
+
+    async def initialize(self) -> None:
+        pass
+
+    async def retrieve(
+        self,
+        query: str,
+        top_k: int = 3,
+    ) -> list[str]:
+        return [
+            "회원가입을 위해 이메일을 수집합니다."
+        ]
 
 
 def test_health() -> None:
@@ -68,7 +95,13 @@ def test_analysis_returns_evidence_without_personal_values() -> None:
 
 
 def test_structured_analysis_endpoint() -> None:
-    app.dependency_overrides[get_llm_provider] = lambda: FakeProvider()
+    app.dependency_overrides[get_llm_provider] = (
+        lambda: FakeProvider()
+    )
+
+    app.dependency_overrides[get_retriever] = (
+        lambda: FakeRetriever()
+    )
 
     try:
         response = client.post(

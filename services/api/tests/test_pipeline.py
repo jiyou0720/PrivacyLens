@@ -41,7 +41,11 @@ class FakeProvider:
 
 
 class FakeRetriever:
-    async def initialize(self):
+    """
+    CI에서는 실제 Ollama embedding을 호출하지 않는다.
+    """
+
+    async def initialize(self) -> None:
         pass
 
     async def retrieve(
@@ -50,7 +54,7 @@ class FakeRetriever:
         top_k: int = 3,
     ) -> list[str]:
         return [
-            "개인정보 보호법에 따라 개인정보 수집 시 목적과 항목을 명확하게 고지해야 합니다."
+            "회원가입을 위해 이메일을 수집합니다."
         ]
 
 
@@ -84,9 +88,7 @@ def test_pipeline_marks_hallucinated_evidence_for_review() -> None:
     result = analyze("주민등록번호를 수집")
 
     assert result.requires_human_review is True
-
     assert result.extracted.collected_items[0].confidence == 0
-
     assert (
         result.extracted.collected_items[0].necessity
         == Necessity.CONTEXT_REQUIRED
