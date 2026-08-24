@@ -11,7 +11,6 @@ from app.models import (
     PersonalDataItem,
 )
 
-
 client = TestClient(app)
 
 
