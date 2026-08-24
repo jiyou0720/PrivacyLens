@@ -1,23 +1,46 @@
 from __future__ import annotations
 
-import httpx
 import numpy as np
+from openai import AsyncOpenAI
 
 from ..settings import Settings
 
 
-class OllamaEmbeddingProvider:
-    def __init__(self, settings: Settings):
-        self.base_url = settings.ollama_base_url
-        self.model = getattr(
-            settings,
-            "embedding_model",
-            "nomic-embed-text:latest",
+class OpenAIEmbeddingProvider:
+
+    def __init__(
+        self,
+        settings: Settings,
+    ):
+        self.client = AsyncOpenAI(
+            api_key=settings.openai_api_key
         )
 
-    async def embed(self, text: str) -> np.ndarray:
-        embeddings = await self.embed_batch([text])
-        return embeddings[0]
+        self.model = (
+            settings.openai_embedding_model
+        )
+
+    async def embed(
+        self,
+        text: str,
+    ) -> np.ndarray:
+
+        response = (
+            await self.client.embeddings.create(
+                model=self.model,
+                input=text,
+            )
+        )
+
+        if not response.data:
+            raise ValueError(
+                "OpenAI embedding 결과가 없습니다."
+            )
+
+        return np.array(
+            response.data[0].embedding,
+            dtype=np.float32,
+        )
 
     async def embed_batch(
         self,
@@ -27,33 +50,28 @@ class OllamaEmbeddingProvider:
         if not texts:
             return []
 
-        async with httpx.AsyncClient(
-            timeout=120.0
-        ) as client:
-
-            response = await client.post(
-                f"{self.base_url}/api/embed",
-                json={
-                    "model": self.model,
-                    "input": texts,
-                },
+        response = (
+            await self.client.embeddings.create(
+                model=self.model,
+                input=texts,
             )
+        )
 
-            response.raise_for_status()
-
-            data = response.json()
-
-        embeddings = data.get("embeddings")
-
-        if not embeddings:
+        if not response.data:
             raise ValueError(
-                "Ollama에서 embedding 결과를 받지 못했습니다."
+                "OpenAI embedding 결과가 없습니다."
             )
+
+        # API 응답 순서대로 정렬
+        data = sorted(
+            response.data,
+            key=lambda item: item.index,
+        )
 
         return [
             np.array(
-                embedding,
+                item.embedding,
                 dtype=np.float32,
             )
-            for embedding in embeddings
+            for item in data
         ]
