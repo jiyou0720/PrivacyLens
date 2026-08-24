@@ -1,4 +1,6 @@
 import type { ServiceRecord } from "@privacylens/contracts";
+import ConsentAnalysisPanel from "./ConsentAnalysisPanel";
+import { ExportRecordsButton, RecordDetails } from "./RecordActions";
 
 const records: ServiceRecord[] = [
   {
@@ -49,17 +51,19 @@ export default function Home() {
         <article><span>확인 필요 항목</span><strong className="accent">1</strong><small>건</small></article>
       </section>
 
+      <ConsentAnalysisPanel />
+
       <section className="records">
         <div className="sectionTitle">
           <div><p className="eyebrow">MY RECORDS</p><h2>서비스별 제공 이력</h2></div>
-          <button type="button">데이터 내보내기</button>
+          <ExportRecordsButton records={records} />
         </div>
         <div className="recordGrid">
           {records.map((record) => (
             <article className="record" key={record.id}>
               <div className="recordHead"><div className="logo">{record.serviceName[3]}</div><div><h3>{record.serviceName}</h3><p>{record.domain}</p></div><span>{sourceLabel[record.source]}</span></div>
               <div className="chips">{record.dataTypes.map((type) => <span key={type}>{type}</span>)}</div>
-              <div className="recordFoot"><time>{record.recordedAt} 기록</time><a href="#">자세히 보기 →</a></div>
+              <RecordDetails record={record} source={sourceLabel[record.source]} />
             </article>
           ))}
         </div>
