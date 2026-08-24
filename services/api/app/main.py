@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
 from .analyzer import analyze_policy
-from .llm import OllamaProvider
+from .llm import OpenAIProvider
 from .models import (
     AnalyzeRequest,
     ConsentTextAnalysis,
@@ -14,7 +14,7 @@ from .models import (
     PolicyAnalysis,
 )
 from .pipeline import analyze_consent_text
-from .rag.embeddings import OllamaEmbeddingProvider
+from .rag.embeddings import OpenAIEmbeddingProvider
 from .rag.retriever import Retriever
 from .settings import Settings, get_settings
 
@@ -34,7 +34,7 @@ app.add_middleware(
 
 
 # ============================================================
-# LLM Provider
+# OpenAI Provider
 # ============================================================
 
 def get_llm_provider(
@@ -42,8 +42,8 @@ def get_llm_provider(
         Settings,
         Depends(get_settings),
     ],
-) -> OllamaProvider:
-    return OllamaProvider(settings)
+) -> OpenAIProvider:
+    return OpenAIProvider(settings)
 
 
 # ============================================================
@@ -57,7 +57,7 @@ def get_retriever(
     ],
 ) -> Retriever:
 
-    embedding_provider = OllamaEmbeddingProvider(
+    embedding_provider = OpenAIEmbeddingProvider(
         settings
     )
 
@@ -91,7 +91,7 @@ def analyze(
 
 # ============================================================
 # Consent Text Analysis
-# Rule Engine + Ollama + RAG + Risk Engine
+# Rule Engine + OpenAI + RAG
 # ============================================================
 
 @app.post(
@@ -105,7 +105,7 @@ async def analyze_text(
         Depends(get_settings),
     ],
     provider: Annotated[
-        OllamaProvider,
+        OpenAIProvider,
         Depends(get_llm_provider),
     ],
     retriever: Annotated[
@@ -115,11 +115,10 @@ async def analyze_text(
 ) -> ConsentTextAnalysis:
 
     try:
-
-        # RAG Retriever 초기화
+        # RAG 초기화
         await retriever.initialize()
 
-        # 전체 분석 Pipeline 실행
+        # 전체 분석 Pipeline
         return await analyze_consent_text(
             request=request,
             provider=provider,
@@ -132,9 +131,12 @@ async def analyze_text(
         ValidationError,
         KeyError,
         ValueError,
+        RuntimeError,
     ) as exc:
 
-        print(f"[ERROR] {type(exc).__name__}: {exc}")
+        print(
+            f"[ERROR] {type(exc).__name__}: {exc}"
+        )
 
         raise HTTPException(
             status_code=503,

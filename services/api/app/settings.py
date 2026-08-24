@@ -4,13 +4,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="PRIVACYLENS_", env_file=".env")
+    openai_api_key: str
+    openai_model: str = "gpt-5.6-luna"
+    openai_embedding_model: str = "text-embedding-3-small"
 
-    ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "qwen3:0.6b"
-    ollama_timeout_seconds: float = 120
-    prompt_version: str = "consent-extraction-v1"
-    rule_version: str = "consent-rules-v1"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 @lru_cache
