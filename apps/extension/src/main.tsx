@@ -16,8 +16,22 @@ type Analysis = {
 async function readLinkedDocuments(urls: string[], pageUrl: string): Promise<{ texts: string[]; attempted: number }> {
   const pageOrigin = new URL(pageUrl).origin;
   const candidates = urls.slice(0, 8);
+  const requestedOrigins = Array.from(new Set(candidates
+    .map((url) => {
+      try { return `${new URL(url).origin}/*`; } catch { return null; }
+    })
+    .filter((origin): origin is string => origin !== null)
+    .filter((origin) => !origin.startsWith(`${pageOrigin}/`))));
+  let allowedOrigins = new Set<string>();
+  if (requestedOrigins.length) {
+    const granted = await chrome.permissions.request({ origins: requestedOrigins }).catch(() => false);
+    if (granted) allowedOrigins = new Set(requestedOrigins.map((origin) => origin.slice(0, -2)));
+  }
   const safeUrls = candidates.filter((url) => {
-    try { return new URL(url).origin === pageOrigin; } catch { return false; }
+    try {
+      const origin = new URL(url).origin;
+      return origin === pageOrigin || allowedOrigins.has(origin);
+    } catch { return false; }
   });
   const texts: string[] = [];
   for (const url of safeUrls) {
