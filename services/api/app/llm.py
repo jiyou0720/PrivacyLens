@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Protocol
 
 from openai import AsyncOpenAI
@@ -69,14 +68,14 @@ class OpenAIProvider:
 위 문서를 분석하여 개인정보 동의 정보를 JSON으로 추출하세요.
 """
 
-        response = await self.client.responses.create(
+        response = await self.client.responses.parse(
             model=self.model_name,
             instructions=SYSTEM_PROMPT,
             input=user_prompt,
+            text_format=ExtractedConsent,
         )
 
-        raw = response.output_text
+        if response.output_parsed is None:
+            raise ValueError("OpenAI에서 구조화된 분석 결과를 받지 못했습니다.")
 
-        data = json.loads(raw)
-
-        return ExtractedConsent.model_validate(data)
+        return response.output_parsed
