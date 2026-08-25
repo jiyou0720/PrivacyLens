@@ -3,3 +3,5 @@
 .legalBases{display:grid;gap:7px}.legalBases a{padding:9px;border-radius:7px;background:#f5f7f5;color:#263d33;text-decoration:none;font-size:10px}.legalBases strong,.legalBases span{display:block}.legalBases span{margin-top:3px;color:#718078}.legalBases p{margin:7px 0 5px}.legalBases p b{color:#187a52}.legalBases em{color:#187a52;font-style:normal;font-weight:800}
 
 .coverage{color:#68766f;font-size:10px!important}
+
+.insufficient{background:#fff8e6!important;color:#8a5a00!important;border:1px solid #f0cf7a}

@@ -196,12 +196,12 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
                 confidence=item.confidence,
             )
 
-        is_unique_identifier = (
-            item.unique_identifier
-            or any(
-                keyword in normalized
-                for keyword in UNIQUE_IDENTIFIER_KEYWORDS
-            )
+        # 서비스 계정 ID·내부 식별값은 개인정보일 수 있지만 법령상
+        # 고유식별정보는 아닙니다. 모델의 boolean 추정만으로 제24조를
+        # 적용하지 않고 법정 식별번호가 원문 항목명에 명시된 경우만 봅니다.
+        is_unique_identifier = any(
+            keyword in normalized
+            for keyword in UNIQUE_IDENTIFIER_KEYWORDS
         )
 
         if is_unique_identifier:

@@ -45,6 +45,7 @@ function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [coverage, setCoverage] = useState("");
+  const [incomplete, setIncomplete] = useState(false);
 
   async function analyze() {
     setError(""); setLoading(true); setAnalysis(null);
@@ -67,6 +68,7 @@ function App() {
       const linked = await readLinkedDocuments(scan.documentUrls ?? [], scan.page.url);
       const documentText = [scan.analysisText, ...linked.texts].join("\n\n").slice(0, 100000);
       setCoverage(linked.attempted ? `연결 문서 ${linked.texts.length}/${linked.attempted}개 반영` : "현재 화면 기준 분석");
+      setIncomplete(linked.attempted > linked.texts.length);
       if (linked.attempted > 0 && linked.texts.length === 0) {
         setError("연결된 약관 원문을 읽지 못해 정확한 위험 점수를 계산할 수 없습니다. 분석 불충분 상태입니다.");
         setLoading(false); return;
@@ -90,9 +92,11 @@ function App() {
     }
   }
 
-  const critical = result?.warnings.length || (analysis && analysis.risk_summary.score > 0);
+  const critical = !incomplete && (result?.warnings.length || (analysis && analysis.risk_summary.score > 0));
   const detectedFields = new Map<string, string>();
-  analysis?.extracted.collected_items.forEach((item) => detectedFields.set(item.original_name, `${item.original_name} · 동의문 명시`));
+  analysis?.extracted.collected_items
+    .filter((item) => !/비밀번호|password/i.test(`${item.original_name} ${item.normalized_name}`))
+    .forEach((item) => detectedFields.set(item.original_name, `${item.original_name} · 동의문 명시`));
   result?.fields.forEach((field) => {
     const label = categoryLabel[field.category];
     if (!detectedFields.has(label)) detectedFields.set(label, `${label} · ${field.requirement}`);
@@ -105,10 +109,10 @@ function App() {
     {result && <div className={`result ${critical ? "riskCritical" : ""}`}>
       <h2>{result.page.domain}</h2>
       {coverage && <p className="coverage">{coverage}</p>}
-      {analysis && <div className="risk"><strong>{analysis.risk_summary.level}</strong><span>위험 점수 {analysis.risk_summary.score}</span><p>{analysis.risk_summary.explanation}</p></div>}
+      {analysis && incomplete ? <div className="risk insufficient"><strong>분석 불충분</strong><p>연결된 약관 일부를 읽지 못해 위험 점수와 등급을 표시하지 않습니다.</p></div> : analysis && <div className="risk"><strong>{analysis.risk_summary.level}</strong><span>위험 점수 {analysis.risk_summary.score}</span><p>{analysis.risk_summary.explanation}</p></div>}
       <label>탐지된 개인정보 필드</label><div className="chips">{detectedFields.size ? Array.from(detectedFields.entries()).map(([key, text]) => <span key={key}>{text}</span>) : <em>탐지된 항목 없음</em>}</div>
       <label>동의 항목</label><p>{result.consents.length}개 탐지 · 기본 선택 경고 {result.warnings.length}건</p>
-      {analysis && analysis.findings.some((finding) => finding.legal_bases.length) && <><label>관련 법령 근거</label><div className="legalBases">{analysis.findings.flatMap((finding) => finding.legal_bases.map((basis) => <a key={`${finding.rule_id}-${basis.law_name}-${basis.article}`} href={basis.source_url} target="_blank" rel="noreferrer"><strong>{basis.law_name} {basis.article}</strong><span>{basis.title}</span><p><b>핵심 요약</b> {basis.rationale}</p><em>해당 조문 원문 보기 →</em></a>))}</div></>}
+      {analysis && !incomplete && analysis.findings.some((finding) => finding.legal_bases.length) && <><label>관련 법령 근거</label><div className="legalBases">{analysis.findings.flatMap((finding) => finding.legal_bases.map((basis) => <a key={`${finding.rule_id}-${basis.law_name}-${basis.article}`} href={basis.source_url} target="_blank" rel="noreferrer"><strong>{basis.law_name} {basis.article}</strong><span>{basis.title}</span><p><b>핵심 요약</b> {basis.rationale}</p><em>해당 조문 원문 보기 →</em></a>))}</div></>}
       <a className="webLink" href={WEB_SERVICE_URL} target="_blank" rel="noreferrer">웹서비스에서 자세히 보기</a>
       <footer>요청 ID {result.requestId.slice(0, 12)}…</footer>
     </div>}

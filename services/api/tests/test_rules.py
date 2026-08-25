@@ -80,3 +80,31 @@ def test_disclosure_only_score_is_capped() -> None:
 
     assert summary.score == 30
     assert summary.level == "MEDIUM"
+
+def test_service_account_id_is_not_unique_identifier() -> None:
+    data = ExtractedConsent(
+        purposes=["회원 관리"], retention_period="회원 탈퇴 시까지",
+        refusal_right_present=True, refusal_consequence_present=True,
+        collected_items=[PersonalDataItem(
+            original_name="네이버 아이디(아이디 식별값 포함)",
+            normalized_name="서비스 아이디", unique_identifier=True,
+            necessity=Necessity.NECESSARY, reason="회원 식별",
+            evidence_text="네이버 아이디를 수집합니다.",
+        )],
+    )
+    ids = {finding.rule_id for finding in evaluate_rules(data)}
+    assert "UNIQUE_IDENTIFIER_REVIEW" not in ids
+
+
+def test_statutory_identifier_is_unique_identifier() -> None:
+    data = ExtractedConsent(
+        purposes=["본인 확인"], retention_period="확인 완료 시까지",
+        refusal_right_present=True, refusal_consequence_present=True,
+        collected_items=[PersonalDataItem(
+            original_name="여권번호", normalized_name="여권번호",
+            necessity=Necessity.CONTEXT_REQUIRED, reason="본인 확인",
+            evidence_text="여권번호를 수집합니다.",
+        )],
+    )
+    ids = {finding.rule_id for finding in evaluate_rules(data)}
+    assert "UNIQUE_IDENTIFIER_REVIEW" in ids
