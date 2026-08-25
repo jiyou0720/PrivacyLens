@@ -180,6 +180,14 @@ export function scanPage(requestId: string): PageScanResult {
       }]
     : [];
 
+  const documentUrls = Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]"))
+    .filter((link) => /개인정보|약관|동의|privacy|policy|terms|보기/i.test(`${link.textContent ?? ""} ${link.href}`))
+    .map((link) => link.href)
+    .filter((url) => {
+      try { return new URL(url).origin === location.origin; } catch { return false; }
+    })
+    .filter((url, index, urls) => urls.indexOf(url) === index)
+    .slice(0, 8);
   const analysisParts = [
     document.title,
     ...fields.flatMap((field) => [field.evidence.label, field.evidence.nearbyText]),
@@ -202,6 +210,7 @@ export function scanPage(requestId: string): PageScanResult {
     consents,
     warnings,
     analysisText,
+    documentUrls,
     privacy: { inputValuesCollected: false, fullHtmlCollected: false },
   };
 }

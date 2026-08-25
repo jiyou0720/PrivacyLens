@@ -7,6 +7,7 @@ const result: PageScanResult = {
   page: { domain: "example.com", url: "https://example.com/signup", title: "가입" },
   fields: [], consents: [], warnings: [],
   analysisText: "개인정보 수집 동의 테스트 문구입니다.",
+  documentUrls: [],
   privacy: { inputValuesCollected: false, fullHtmlCollected: false },
 };
 

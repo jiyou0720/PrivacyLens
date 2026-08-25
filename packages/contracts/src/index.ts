@@ -110,6 +110,7 @@ export interface PageScanResult {
   consents: ConsentItem[];
   warnings: DetectionWarning[];
   analysisText: string;
+  documentUrls: string[];
   privacy: {
     inputValuesCollected: false;
     fullHtmlCollected: false;

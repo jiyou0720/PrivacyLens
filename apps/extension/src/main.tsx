@@ -13,6 +13,25 @@ type Analysis = {
   risk_summary: { score: number; level: string; explanation: string };
 };
 
+async function readLinkedDocuments(urls: string[], pageUrl: string): Promise<{ texts: string[]; attempted: number }> {
+  const pageOrigin = new URL(pageUrl).origin;
+  const safeUrls = urls.filter((url) => {
+    try { return new URL(url).origin === pageOrigin; } catch { return false; }
+  }).slice(0, 8);
+  const texts: string[] = [];
+  for (const url of safeUrls) {
+    try {
+      const response = await fetch(url, { credentials: "include", signal: AbortSignal.timeout(8000) });
+      if (!response.ok || !response.headers.get("content-type")?.includes("text/html")) continue;
+      const html = await response.text();
+      const document = new DOMParser().parseFromString(html, "text/html");
+      document.querySelectorAll("script, style, noscript, svg, nav, footer").forEach((node) => node.remove());
+      const text = (document.body?.innerText ?? document.body?.textContent ?? "").replace(/\s+/g, " ").trim();
+      if (text.length >= 100) texts.push(`[연결 문서: ${url}]\n${text.slice(0, 15000)}`);
+    } catch { /* 읽을 수 없는 연결 문서는 분석 신뢰도에서 처리합니다. */ }
+  }
+  return { texts, attempted: safeUrls.length };
+}
 const categoryLabel: Record<string, string> = {
   name: "이름", email: "이메일", phone: "휴대전화번호", address: "주소",
   birth_date: "생년월일", gender: "성별", nickname: "닉네임", location: "위치정보",
@@ -24,6 +43,7 @@ function App() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [coverage, setCoverage] = useState("");
 
   async function analyze() {
     setError(""); setLoading(true); setAnalysis(null);
@@ -43,13 +63,20 @@ function App() {
     }
 
     try {
+      const linked = await readLinkedDocuments(scan.documentUrls ?? [], scan.page.url);
+      const documentText = [scan.analysisText, ...linked.texts].join("\n\n").slice(0, 100000);
+      setCoverage(linked.attempted ? `연결 문서 ${linked.texts.length}/${linked.attempted}개 반영` : "현재 화면 기준 분석");
+      if (linked.attempted > 0 && linked.texts.length === 0) {
+        setError("연결된 약관 원문을 읽지 못해 정확한 위험 점수를 계산할 수 없습니다. 분석 불충분 상태입니다.");
+        setLoading(false); return;
+      }
       const apiResponse = await fetch(`${WEB_SERVICE_URL}/api/v1/analyses/text`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           service_name: scan.page.title || scan.page.domain,
           service_function: "현재 페이지의 개인정보 입력 및 동의",
-          document_text: scan.analysisText,
+          document_text: documentText,
         }),
       });
       const payload = await apiResponse.json().catch(() => null);
@@ -76,6 +103,7 @@ function App() {
     {error && <p className="error" role="alert">{error}</p>}
     {result && <div className={`result ${critical ? "riskCritical" : ""}`}>
       <h2>{result.page.domain}</h2>
+      {coverage && <p className="coverage">{coverage}</p>}
       {analysis && <div className="risk"><strong>{analysis.risk_summary.level}</strong><span>위험 점수 {analysis.risk_summary.score}</span><p>{analysis.risk_summary.explanation}</p></div>}
       <label>탐지된 개인정보 필드</label><div className="chips">{detectedFields.size ? Array.from(detectedFields.entries()).map(([key, text]) => <span key={key}>{text}</span>) : <em>탐지된 항목 없음</em>}</div>
       <label>동의 항목</label><p>{result.consents.length}개 탐지 · 기본 선택 경고 {result.warnings.length}건</p>

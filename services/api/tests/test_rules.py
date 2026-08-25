@@ -69,3 +69,14 @@ def test_findings_include_legal_bases() -> None:
     )
     assert any(basis.source_url.endswith('/제15조') for basis in purpose.legal_bases)
     assert any(basis.source_url.endswith('/제17조') for basis in purpose.legal_bases)
+
+
+def test_disclosure_only_score_is_capped() -> None:
+    from app.rag.risk_engine import build_risk_summary
+
+    extracted = ExtractedConsent()
+    findings = evaluate_rules(extracted)
+    summary = build_risk_summary(findings, extracted, [])
+
+    assert summary.score == 30
+    assert summary.level == "MEDIUM"

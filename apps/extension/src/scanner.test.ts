@@ -74,6 +74,13 @@ describe("scanPage", () => {
     expect(result.consents[0]).toMatchObject({ category: "privacy_collection", requirement: "required" });
     expect(result.consents[1]).toMatchObject({ category: "marketing", requirement: "optional", checkedByDefault: true });
   });
+  it("같은 출처의 약관 및 개인정보 링크를 수집한다", () => {
+    document.body.innerHTML = `
+      <a href="/policy/privacy">개인정보 처리방침 보기</a>
+      <a href="https://external.example/terms">외부 약관</a>`;
+    const result = scanPage("request-documents");
+    expect(result.documentUrls).toEqual(["http://localhost:3000/policy/privacy"]);
+  });
   it("이미 입력된 실제 값과 비밀번호를 결과 및 직렬화 데이터에 포함하지 않는다", () => {
     document.body.innerHTML = `
       <label>이메일<input type="email" value="never-leak@example.com" /></label>
