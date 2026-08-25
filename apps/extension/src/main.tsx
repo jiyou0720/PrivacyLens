@@ -8,7 +8,7 @@ const WEB_SERVICE_URL = "https://privacylens.site";
 
 type Analysis = {
   service_name: string;
-  extracted: { collected_items: Array<{ normalized_name: string }> };
+  extracted: { collected_items: Array<{ original_name: string; normalized_name: string }> };
   risk_summary: { score: number; level: string; explanation: string };
 };
 
@@ -62,6 +62,12 @@ function App() {
   }
 
   const critical = result?.warnings.length || (analysis && analysis.risk_summary.score > 0);
+  const detectedFields = new Map<string, string>();
+  analysis?.extracted.collected_items.forEach((item) => detectedFields.set(item.original_name, `${item.original_name} · 동의문 명시`));
+  result?.fields.forEach((field) => {
+    const label = categoryLabel[field.category];
+    if (!detectedFields.has(label)) detectedFields.set(label, `${label} · ${field.requirement}`);
+  });
 
   return <main>
     <header><strong>Privacy<span>Lens</span></strong><small>실제 입력값은 읽지 않아요</small></header>
@@ -70,7 +76,7 @@ function App() {
     {result && <div className={`result ${critical ? "riskCritical" : ""}`}>
       <h2>{result.page.domain}</h2>
       {analysis && <div className="risk"><strong>{analysis.risk_summary.level}</strong><span>위험 점수 {analysis.risk_summary.score}</span><p>{analysis.risk_summary.explanation}</p></div>}
-      <label>탐지된 개인정보 필드</label><div className="chips">{result.fields.length ? result.fields.map((field) => <span key={field.id}>{categoryLabel[field.category]} · {field.requirement}</span>) : <em>탐지된 항목 없음</em>}</div>
+      <label>탐지된 개인정보 필드</label><div className="chips">{detectedFields.size ? Array.from(detectedFields.entries()).map(([key, text]) => <span key={key}>{text}</span>) : <em>탐지된 항목 없음</em>}</div>
       <label>동의 항목</label><p>{result.consents.length}개 탐지 · 기본 선택 경고 {result.warnings.length}건</p>
       <a className="webLink" href={WEB_SERVICE_URL} target="_blank" rel="noreferrer">웹서비스에서 자세히 보기</a>
       <footer>요청 ID {result.requestId.slice(0, 12)}…</footer>
