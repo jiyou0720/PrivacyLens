@@ -15,9 +15,10 @@ type Analysis = {
 
 async function readLinkedDocuments(urls: string[], pageUrl: string): Promise<{ texts: string[]; attempted: number }> {
   const pageOrigin = new URL(pageUrl).origin;
-  const safeUrls = urls.filter((url) => {
+  const candidates = urls.slice(0, 8);
+  const safeUrls = candidates.filter((url) => {
     try { return new URL(url).origin === pageOrigin; } catch { return false; }
-  }).slice(0, 8);
+  });
   const texts: string[] = [];
   for (const url of safeUrls) {
     try {
@@ -30,7 +31,7 @@ async function readLinkedDocuments(urls: string[], pageUrl: string): Promise<{ t
       if (text.length >= 100) texts.push(`[연결 문서: ${url}]\n${text.slice(0, 15000)}`);
     } catch { /* 읽을 수 없는 연결 문서는 분석 신뢰도에서 처리합니다. */ }
   }
-  return { texts, attempted: safeUrls.length };
+  return { texts, attempted: candidates.length };
 }
 const categoryLabel: Record<string, string> = {
   name: "이름", email: "이메일", phone: "휴대전화번호", address: "주소",

@@ -79,7 +79,7 @@ describe("scanPage", () => {
       <a href="/policy/privacy">개인정보 처리방침 보기</a>
       <a href="https://external.example/terms">외부 약관</a>`;
     const result = scanPage("request-documents");
-    expect(result.documentUrls).toEqual(["http://localhost:3000/policy/privacy"]);
+    expect(result.documentUrls).toEqual(["http://localhost:3000/policy/privacy", "https://external.example/terms"]);
   });
   it("이미 입력된 실제 값과 비밀번호를 결과 및 직렬화 데이터에 포함하지 않는다", () => {
     document.body.innerHTML = `

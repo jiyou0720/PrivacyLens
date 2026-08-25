@@ -184,7 +184,7 @@ export function scanPage(requestId: string): PageScanResult {
     .filter((link) => /개인정보|약관|동의|privacy|policy|terms|보기/i.test(`${link.textContent ?? ""} ${link.href}`))
     .map((link) => link.href)
     .filter((url) => {
-      try { return new URL(url).origin === location.origin; } catch { return false; }
+      try { return ["http:", "https:"].includes(new URL(url).protocol); } catch { return false; }
     })
     .filter((url, index, urls) => urls.indexOf(url) === index)
     .slice(0, 8);
