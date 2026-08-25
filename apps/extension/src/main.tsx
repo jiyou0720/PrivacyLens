@@ -61,7 +61,7 @@ function App() {
     }
   }
 
-  const critical = result?.warnings.length || (analysis && ["HIGH", "CRITICAL"].includes(analysis.risk_summary.level));
+  const critical = result?.warnings.length || (analysis && analysis.risk_summary.score > 0);
 
   return <main>
     <header><strong>Privacy<span>Lens</span></strong><small>실제 입력값은 읽지 않아요</small></header>
