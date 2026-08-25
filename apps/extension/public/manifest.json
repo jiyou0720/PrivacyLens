@@ -5,5 +5,5 @@
   "description": "회원가입 화면의 개인정보 유형과 동의 항목을 확인합니다.",
   "action": { "default_popup": "index.html", "default_title": "PrivacyLens" },
   "permissions": ["activeTab", "scripting", "storage"],
-  "host_permissions": []
+  "host_permissions": ["https://privacylens.site/*"]
 }

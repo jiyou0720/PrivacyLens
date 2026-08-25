@@ -164,6 +164,19 @@ export function scanPage(requestId: string): PageScanResult {
       }]
     : [];
 
+  const analysisParts = [
+    document.title,
+    ...fields.flatMap((field) => [field.evidence.label, field.evidence.nearbyText]),
+    ...consents.map((consent) => consent.title),
+    ...Array.from(document.querySelectorAll<HTMLElement>(
+      "[class*=privacy i], [id*=privacy i], [class*=consent i], [id*=consent i], [class*=agree i], [id*=agree i]",
+    )).map((element) => visibleTextWithoutControls(element)),
+  ].filter((part): part is string => Boolean(part));
+  const analysisText = Array.from(new Set(analysisParts))
+    .join("\n")
+    .replace(/\s+\n/g, "\n")
+    .slice(0, 20_000);
+
   return {
     schemaVersion: "1.0",
     requestId,
@@ -172,6 +185,7 @@ export function scanPage(requestId: string): PageScanResult {
     fields,
     consents,
     warnings,
+    analysisText,
     privacy: { inputValuesCollected: false, fullHtmlCollected: false },
   };
 }

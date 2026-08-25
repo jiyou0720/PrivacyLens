@@ -4,3 +4,5 @@ pydantic
 pydantic-settings
 numpy
 faiss-cpu
+python-multipart
+pypdf
