@@ -22,3 +22,4 @@ h1 { margin:0; max-width:760px; font-size:clamp(42px,6vw,78px); line-height:1.08
 
 .analysisForm input[type=file]{padding:9px;background:var(--paper)}.analysisForm textarea:disabled{opacity:.7}.criticalResult{border-color:#d92d20}.criticalResult .logo{background:#fff0ee;color:#b42318}.criticalLevel{color:#b42318!important;font-weight:900}
 .recordHead>span.criticalBadge{background:#fff0ee;color:#b42318;font-weight:900}
+.resultItem a{color:var(--green);font-weight:700;text-decoration:none}

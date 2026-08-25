@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-5.6-luna"
     openai_embedding_model: str = "text-embedding-3-small"
     prompt_version: str = "v1"
-    rule_version: str = "v1"
+    rule_version: str = "consent-rules-v3"
 
     model_config = SettingsConfigDict(
         env_file=".env",

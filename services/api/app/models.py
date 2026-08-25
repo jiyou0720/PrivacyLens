@@ -83,8 +83,18 @@ class RiskLevel(StrEnum):
     CRITICAL = "CRITICAL"
 
 
+class LegalBasis(BaseModel):
+    law_name: str
+    article: str
+    title: str
+    rationale: str
+    source_url: str
+
+
 class RuleFinding(BaseModel):
     rule_id: str
+
+    legal_bases: list[LegalBasis] = Field(default_factory=list)
 
     # 기존 Rule Engine의 심각도
     severity: RuleSeverity

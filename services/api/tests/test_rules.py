@@ -52,3 +52,18 @@ def test_sensitive_item_requires_high_review() -> None:
     )
 
     assert finding.severity == "high"
+
+def test_findings_include_legal_bases() -> None:
+    findings = evaluate_rules(ExtractedConsent())
+    purpose = next(finding for finding in findings if finding.rule_id == "PURPOSE_MISSING")
+
+    assert any(
+        basis.law_name == "개인정보 보호법"
+        and basis.article == "제15조 제2항"
+        for basis in purpose.legal_bases
+    )
+    assert any(
+        basis.law_name == "개인정보 보호법 시행령"
+        and basis.article == "제17조"
+        for basis in purpose.legal_bases
+    )

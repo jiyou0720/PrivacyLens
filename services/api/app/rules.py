@@ -1,4 +1,4 @@
-from .models import ExtractedConsent, RuleFinding, RuleSeverity
+from .models import ExtractedConsent, LegalBasis, RuleFinding, RuleSeverity
 
 AMBIGUOUS_RETENTION = (
     "필요시",
@@ -14,7 +14,41 @@ UNIQUE_IDENTIFIER_KEYWORDS = (
     "외국인등록번호",
 )
 
-RULE_VERSION = "consent-rules-v2"
+RULE_VERSION = "consent-rules-v3"
+
+PIPA_URL = "https://www.law.go.kr/법령/개인정보보호법"
+PIPA_DECREE_URL = "https://www.law.go.kr/법령/개인정보보호법시행령"
+
+
+def legal_basis(article: str, title: str, rationale: str) -> LegalBasis:
+    return LegalBasis(
+        law_name="개인정보 보호법",
+        article=article,
+        title=title,
+        rationale=rationale,
+        source_url=PIPA_URL,
+    )
+
+
+CONSENT_METHOD = LegalBasis(
+    law_name="개인정보 보호법 시행령",
+    article="제17조",
+    title="동의를 받는 방법",
+    rationale="정보주체가 동의 내용을 확인할 수 있는 방법으로 동의를 받아야 합니다.",
+    source_url=PIPA_DECREE_URL,
+)
+
+LEGAL_BASES: dict[str, list[LegalBasis]] = {
+    "PURPOSE_MISSING": [legal_basis("제15조 제2항", "개인정보의 수집·이용", "수집·이용 목적을 알려야 합니다."), CONSENT_METHOD],
+    "ITEMS_MISSING": [legal_basis("제15조 제2항", "개인정보의 수집·이용", "수집할 개인정보 항목을 알려야 합니다."), CONSENT_METHOD],
+    "RETENTION_MISSING": [legal_basis("제15조 제2항", "개인정보의 수집·이용", "보유·이용 기간을 알려야 합니다.")],
+    "REFUSAL_RIGHT_MISSING": [legal_basis("제15조 제2항", "개인정보의 수집·이용", "동의 거부권을 알려야 합니다."), CONSENT_METHOD],
+    "REFUSAL_CONSEQUENCE_MISSING": [legal_basis("제15조 제2항", "개인정보의 수집·이용", "거부 시 불이익이 있다면 그 내용을 알려야 합니다."), CONSENT_METHOD],
+    "RETENTION_AMBIGUOUS": [legal_basis("제15조 제2항", "개인정보의 수집·이용", "보유·이용 기간을 구체적으로 알려야 합니다."), legal_basis("제21조", "개인정보의 파기", "불필요해진 개인정보는 지체 없이 파기해야 합니다.")],
+    "SPECIAL_DATA_REVIEW": [legal_basis("제23조", "민감정보의 처리 제한", "법령 근거가 없다면 민감정보에 대해 별도 동의가 필요합니다.")],
+    "UNIQUE_IDENTIFIER_REVIEW": [legal_basis("제24조", "고유식별정보의 처리 제한", "법령 근거가 없다면 고유식별정보에 대해 별도 동의가 필요합니다.")],
+    "THIRD_PARTY_PROVISION_MISSING": [legal_basis("제17조 제2항", "개인정보의 제공", "제3자 제공 관련 필수 사항을 알려야 합니다.")],
+}
 
 
 def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
@@ -32,10 +66,12 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
         evidence_text: str | None = None,
         affected_items: list[str] | None = None,
         confidence: float = 1.0,
+        legal_bases: list[LegalBasis] | None = None,
     ) -> None:
         findings.append(
             RuleFinding(
                 rule_id=rule_id,
+                legal_bases=legal_bases or LEGAL_BASES.get(rule_id, []),
                 severity=severity,
                 category=category,
                 title=title,

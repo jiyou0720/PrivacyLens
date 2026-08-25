@@ -17,6 +17,7 @@ class LLMProvider(Protocol):
         self,
         document_text: str,
         service_function: str | None,
+        rag_content: str | None = None,
     ) -> ExtractedConsent:
         ...
 
@@ -56,6 +57,7 @@ class OpenAIProvider:
         self,
         document_text: str,
         service_function: str | None,
+        rag_content: str | None = None,
     ) -> ExtractedConsent:
 
         user_prompt = f"""
@@ -64,6 +66,11 @@ class OpenAIProvider:
 
 개인정보 동의서 원문:
 {document_text}
+
+관련 법령 참고자료:
+{rag_content or "제공되지 않음"}
+
+법령 참고자료는 해석의 보조자료로만 사용하고, 개인정보 항목의 evidence_text에는 반드시 동의서 원문만 인용하세요.
 
 위 문서를 분석하여 개인정보 동의 정보를 JSON으로 추출하세요.
 """
