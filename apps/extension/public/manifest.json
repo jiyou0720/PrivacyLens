@@ -3,8 +3,10 @@
   "name": "PrivacyLens",
   "version": "0.1.7",
   "description": "회원가입 화면의 개인정보 유형과 동의 항목을 확인합니다.",
-  "action": { "default_popup": "index.html", "default_title": "PrivacyLens" },
-  "permissions": ["activeTab", "scripting", "storage"],
+  "action": { "default_title": "PrivacyLens 열기" },
+  "side_panel": { "default_path": "index.html" },
+  "background": { "service_worker": "background.js" },
+  "permissions": ["activeTab", "scripting", "storage", "sidePanel"],
   "host_permissions": ["https://privacylens.site/*"],
   "optional_host_permissions": ["https://*/*"]
 }
