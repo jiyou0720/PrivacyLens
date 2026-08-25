@@ -33,7 +33,7 @@ class VectorStore:
             dtype=np.float32,
         )
 
-        indices = self.index.search(
+        _, indices = self.index.search(
             query,
             top_k,
         )
