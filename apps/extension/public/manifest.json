@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PrivacyLens",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "회원가입 화면의 개인정보 유형과 동의 항목을 확인합니다.",
   "action": { "default_title": "PrivacyLens 열기" },
   "side_panel": { "default_path": "index.html" },
