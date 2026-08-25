@@ -59,9 +59,21 @@ describe("scanPage", () => {
       <input id="custom" name="profileQuestion" />`;
     const result = scanPage("request-aria");
     expect(result.fields[0]).toMatchObject({ category: "phone", requirement: "required" });
-    expect(result.fields[1]).toMatchObject({ category: "unknown", status: "needs_review" });
+    expect(result.fields).toHaveLength(1);
   });
 
+  it("커스텀 체크박스를 동의 항목으로 탐지하고 숨김 필드를 제외한다", () => {
+    document.body.innerHTML = `
+      <input type="hidden" name="token" value="secret" />
+      <div role="checkbox" aria-checked="false" aria-label="[필수] 개인정보 수집 및 이용 동의"></div>
+      <div role="checkbox" aria-checked="true" aria-label="[선택] 마케팅 정보 수신 동의"></div>`;
+
+    const result = scanPage("request-custom-consents");
+    expect(result.fields).toEqual([]);
+    expect(result.consents).toHaveLength(2);
+    expect(result.consents[0]).toMatchObject({ category: "privacy_collection", requirement: "required" });
+    expect(result.consents[1]).toMatchObject({ category: "marketing", requirement: "optional", checkedByDefault: true });
+  });
   it("이미 입력된 실제 값과 비밀번호를 결과 및 직렬화 데이터에 포함하지 않는다", () => {
     document.body.innerHTML = `
       <label>이메일<input type="email" value="never-leak@example.com" /></label>

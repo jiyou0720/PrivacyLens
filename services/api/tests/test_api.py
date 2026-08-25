@@ -124,3 +124,35 @@ def test_structured_analysis_endpoint() -> None:
     assert body["model_name"] == "fake-model"
     assert body["unverified_evidence"] == []
     assert "risk_score" not in body
+
+def test_file_analysis_endpoint() -> None:
+    app.dependency_overrides[get_llm_provider] = lambda: FakeProvider()
+    app.dependency_overrides[get_retriever] = lambda: FakeRetriever()
+
+    try:
+        response = client.post(
+            "/api/v1/analyses/file",
+            data={"service_name": "파일 테스트", "service_function": "회원 가입"},
+            files={
+                "file": (
+                    "consent.txt",
+                    "회원가입을 위해 이메일을 수집합니다. 보유 기간은 회원 탈퇴 시까지입니다.".encode(),
+                    "text/plain",
+                )
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["service_name"] == "파일 테스트"
+
+
+def test_file_analysis_rejects_unsupported_extension() -> None:
+    response = client.post(
+        "/api/v1/analyses/file",
+        data={"service_name": "파일 테스트"},
+        files={"file": ("consent.exe", b"not a document", "application/octet-stream")},
+    )
+
+    assert response.status_code == 400

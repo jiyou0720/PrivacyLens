@@ -109,6 +109,7 @@ export interface PageScanResult {
   fields: DetectedField[];
   consents: ConsentItem[];
   warnings: DetectionWarning[];
+  analysisText: string;
   privacy: {
     inputValuesCollected: false;
     fullHtmlCollected: false;

@@ -117,13 +117,15 @@ export function scanPage(requestId: string): PageScanResult {
   };
 
   const allControls = Array.from(document.querySelectorAll<FormControl>("input, select, textarea"));
-  const consentElements = allControls.filter(
+  const nativeConsents = allControls.filter(
     (control): control is HTMLInputElement => control instanceof HTMLInputElement && control.type === "checkbox",
   );
-  const consentSet = new Set(consentElements);
+  const nativeConsentSet = new Set(nativeConsents);
+  const ignoredInputTypes = new Set(["hidden", "button", "submit", "reset", "image"]);
 
   const fields: DetectedField[] = allControls
-    .filter((control) => !consentSet.has(control as HTMLInputElement))
+    .filter((control) => !nativeConsentSet.has(control as HTMLInputElement))
+    .filter((control) => !(control instanceof HTMLInputElement && ignoredInputTypes.has(control.type)))
     .map((control, index) => {
       const [category, status] = classifyField(control);
       const text = normalize(`${labelText(control)} ${nearbyText(control)}`);
@@ -134,24 +136,38 @@ export function scanPage(requestId: string): PageScanResult {
         status,
         evidence: evidenceFor(control),
       };
-    });
+    })
+    .filter((field) => field.category !== "unknown");
 
-  const consents: ConsentItem[] = consentElements.map((control, index) => {
-    const title = labelText(control) || nearbyText(control) || control.name || `동의 항목 ${index + 1}`;
+  const customConsents = Array.from(document.querySelectorAll<HTMLElement>("[role='checkbox'], [aria-checked]"))
+    .filter((element) => !(element instanceof HTMLInputElement))
+    .filter((element, index, elements) => !elements.some((other, otherIndex) => otherIndex !== index && other.contains(element)));
+  const consentElements: Element[] = [...nativeConsents, ...customConsents];
+
+  const consents: ConsentItem[] = consentElements.map((element, index) => {
+    const native = element instanceof HTMLInputElement ? element : null;
+    const container = element.closest("label, fieldset, li, [role='group'], div");
+    const title = native
+      ? labelText(native) || nearbyText(native) || native.name || `동의 항목 ${index + 1}`
+      : visibleTextWithoutControls(container) || normalize(element.getAttribute("aria-label")) || `동의 항목 ${index + 1}`;
     const category = consentCategory(title);
-    const relatedLink = control.closest("label, fieldset, li, div")?.querySelector<HTMLAnchorElement>("a[href]");
+    const relatedLink = container?.querySelector<HTMLAnchorElement>("a[href]");
+    const requirement = native
+      ? requirementOf(native, title)
+      : /(^|[\s[(])필수([\s)\]]|$)|required|\*/i.test(title)
+        ? "required"
+        : /(^|[\s[(])선택([\s)\]]|$)|optional/i.test(title) ? "optional" : "unknown";
     return {
-      id: stableId("consent", index, control),
+      id: stableId("consent", index, element),
       category,
       title,
-      requirement: requirementOf(control, title),
-      checkedByDefault: control.defaultChecked,
-      disabled: control.disabled,
+      requirement,
+      checkedByDefault: native ? native.defaultChecked : element.getAttribute("aria-checked") === "true",
+      disabled: native ? native.disabled : element.getAttribute("aria-disabled") === "true",
       status: category === "unknown" ? "needs_review" : "confirmed",
       documentUrl: relatedLink?.href,
     };
   });
-
   const preselectedOptional = consents.filter(
     (consent) => consent.checkedByDefault && consent.requirement === "optional",
   );
@@ -164,6 +180,19 @@ export function scanPage(requestId: string): PageScanResult {
       }]
     : [];
 
+  const analysisParts = [
+    document.title,
+    ...fields.flatMap((field) => [field.evidence.label, field.evidence.nearbyText]),
+    ...consents.map((consent) => consent.title),
+    ...Array.from(document.querySelectorAll<HTMLElement>(
+      "[class*=privacy i], [id*=privacy i], [class*=consent i], [id*=consent i], [class*=agree i], [id*=agree i]",
+    )).map((element) => visibleTextWithoutControls(element)),
+  ].filter((part): part is string => Boolean(part));
+  const analysisText = Array.from(new Set(analysisParts))
+    .join("\n")
+    .replace(/\s+\n/g, "\n")
+    .slice(0, 20_000);
+
   return {
     schemaVersion: "1.0",
     requestId,
@@ -172,6 +201,7 @@ export function scanPage(requestId: string): PageScanResult {
     fields,
     consents,
     warnings,
+    analysisText,
     privacy: { inputValuesCollected: false, fullHtmlCollected: false },
   };
 }

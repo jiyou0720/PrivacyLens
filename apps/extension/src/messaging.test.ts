@@ -6,6 +6,7 @@ const result: PageScanResult = {
   schemaVersion: "1.0", requestId: "request-ok", scannedAt: "2026-08-12T00:00:00.000Z",
   page: { domain: "example.com", url: "https://example.com/signup", title: "가입" },
   fields: [], consents: [], warnings: [],
+  analysisText: "개인정보 수집 동의 테스트 문구입니다.",
   privacy: { inputValuesCollected: false, fullHtmlCollected: false },
 };
 
