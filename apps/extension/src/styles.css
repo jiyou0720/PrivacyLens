@@ -5,3 +5,5 @@
 .coverage{color:#68766f;font-size:10px!important}
 
 .insufficient{background:#fff8e6!important;color:#8a5a00!important;border:1px solid #f0cf7a}
+
+.documentStatuses{display:grid;gap:5px;margin:8px 0 12px}.documentStatuses div{display:flex;justify-content:space-between;gap:8px;padding:7px;border-radius:6px;font-size:9px}.documentStatuses span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.documentOk{background:#e8f7ee;color:#236646}.documentFail{background:#fff1ef;color:#b42318}
