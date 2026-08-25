@@ -20,13 +20,18 @@ PIPA_URL = "https://www.law.go.kr/법령/개인정보보호법"
 PIPA_DECREE_URL = "https://www.law.go.kr/법령/개인정보보호법시행령"
 
 
+def article_url(base_url: str, article: str) -> str:
+    """Link to the exact article, not merely the law's opening page."""
+    return f"{base_url}/{article.split()[0]}"
+
+
 def legal_basis(article: str, title: str, rationale: str) -> LegalBasis:
     return LegalBasis(
         law_name="개인정보 보호법",
         article=article,
         title=title,
         rationale=rationale,
-        source_url=PIPA_URL,
+        source_url=article_url(PIPA_URL, article),
     )
 
 
@@ -35,7 +40,7 @@ CONSENT_METHOD = LegalBasis(
     article="제17조",
     title="동의를 받는 방법",
     rationale="정보주체가 동의 내용을 확인할 수 있는 방법으로 동의를 받아야 합니다.",
-    source_url=PIPA_DECREE_URL,
+    source_url=article_url(PIPA_DECREE_URL, "제17조"),
 )
 
 LEGAL_BASES: dict[str, list[LegalBasis]] = {

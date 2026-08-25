@@ -72,7 +72,7 @@ export default function ConsentAnalysisPanel({ onAnalyzed }: Props) {
         <p>{analysis.risk_summary.explanation}</p>
         <div className="chips">{analysis.extracted.collected_items.map((item) => <span key={item.original_name}>{item.normalized_name}</span>)}</div>
         {analysis.extracted.collected_items.map((item) => <div className="resultItem" key={`${item.original_name}-${item.evidence_text}`}><strong>{item.original_name}</strong><p>{item.reason}</p><small>근거: {item.evidence_text}</small></div>)}
-        {analysis.findings.map((finding) => <div className="resultItem" key={finding.rule_id}><strong>{finding.title}</strong><p>{finding.reason}</p><small>권장: {finding.recommendation}</small>{finding.legal_bases.map((basis) => <p key={`${finding.rule_id}-${basis.article}`}><a href={basis.source_url} target="_blank" rel="noreferrer">{basis.law_name} {basis.article} · {basis.title}</a><br /><small>{basis.rationale}</small></p>)}</div>)}
+        {analysis.findings.map((finding) => <div className="resultItem" key={finding.rule_id}><strong>{finding.title}</strong><p>{finding.reason}</p><small>권장: {finding.recommendation}</small>{finding.legal_bases.map((basis) => <p key={`${finding.rule_id}-${basis.law_name}-${basis.article}`}><strong>{basis.law_name} {basis.article} · {basis.title}</strong><br /><small>핵심 요약: {basis.rationale}</small><br /><a href={basis.source_url} target="_blank" rel="noreferrer">해당 조문 원문 보기 →</a></p>)}</div>)}
       </article>}
     </section>
   );

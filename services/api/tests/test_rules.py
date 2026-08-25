@@ -67,3 +67,5 @@ def test_findings_include_legal_bases() -> None:
         and basis.article == "제17조"
         for basis in purpose.legal_bases
     )
+    assert any(basis.source_url.endswith('/제15조') for basis in purpose.legal_bases)
+    assert any(basis.source_url.endswith('/제17조') for basis in purpose.legal_bases)
