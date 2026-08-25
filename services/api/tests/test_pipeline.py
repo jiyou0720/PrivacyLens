@@ -93,3 +93,26 @@ def test_pipeline_marks_hallucinated_evidence_for_review() -> None:
         result.extracted.collected_items[0].necessity
         == Necessity.CONTEXT_REQUIRED
     )
+
+def test_rag_query_is_bounded_for_long_documents() -> None:
+    class RecordingRetriever(FakeRetriever):
+        query_length = 0
+
+        async def retrieve(self, query: str, top_k: int = 3) -> list[str]:
+            self.query_length = len(query)
+            return await super().retrieve(query, top_k)
+
+    document = "회원 가입을 위해 이메일을 수집합니다. " * 3000
+    retriever = RecordingRetriever()
+    request = ConsentTextAnalysisRequest(
+        service_name="긴 약관",
+        document_text=document,
+    )
+    asyncio.run(analyze_consent_text(
+        request,
+        FakeProvider("이메일을 수집"),
+        Settings(),
+        retriever,
+    ))
+
+    assert retriever.query_length < 7000

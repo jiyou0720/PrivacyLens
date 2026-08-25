@@ -1,4 +1,4 @@
-import { StrictMode, useState } from "react";
+import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { PageScanResult } from "@privacylens/contracts";
 import { requestPageScan } from "./messaging";
@@ -61,17 +61,7 @@ function App() {
   const [coverage, setCoverage] = useState("");
   const [incomplete, setIncomplete] = useState(false);
 
-  async function analyze() {
-    setError(""); setLoading(true); setAnalysis(null);
-    const response = await requestPageScan();
-    if (response.type === "PAGE_SCAN_FAILED") {
-      setError(response.error.message); setLoading(false); return;
-    }
-    if (response.type !== "PAGE_SCAN_COMPLETED") {
-      setError("페이지 분석 응답을 확인하지 못했습니다."); setLoading(false); return;
-    }
-
-    const scan = response.payload;
+  async function processScan(scan: PageScanResult) {
     setResult(scan);
     if (scan.analysisText.trim().length < 20) {
       setError("분석할 개인정보 동의문이나 입력 항목을 찾지 못했습니다.");
@@ -79,8 +69,10 @@ function App() {
     }
 
     try {
+      await chrome.storage.local.set({ pendingScan: scan });
       const linked = await readLinkedDocuments(scan.documentUrls ?? [], scan.page.url);
-      const documentText = [scan.analysisText, ...linked.texts].join("\n\n").slice(0, 100000);
+      await chrome.storage.local.remove("pendingScan");
+      const documentText = [scan.analysisText, ...linked.texts].join("\n\n").slice(0, 60000);
       setCoverage(linked.attempted ? `연결 문서 ${linked.texts.length}/${linked.attempted}개 반영` : "현재 화면 기준 분석");
       setIncomplete(linked.attempted > linked.texts.length);
       if (linked.attempted > 0 && linked.texts.length === 0) {
@@ -97,7 +89,7 @@ function App() {
         }),
       });
       const payload = await apiResponse.json().catch(() => null);
-      if (!apiResponse.ok) throw new Error(payload?.detail ?? "AI 분석 요청을 처리하지 못했습니다.");
+      if (!apiResponse.ok) throw new Error(payload?.detail ?? `AI 분석 요청이 실패했습니다. (${apiResponse.status})`);
       setAnalysis(payload as Analysis);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "AI 분석 중 오류가 발생했습니다.");
@@ -105,6 +97,27 @@ function App() {
       setLoading(false);
     }
   }
+
+  async function analyze() {
+    setError(""); setLoading(true); setAnalysis(null); setCoverage("");
+    const response = await requestPageScan();
+    if (response.type === "PAGE_SCAN_FAILED") {
+      setError(response.error.message); setLoading(false); return;
+    }
+    if (response.type !== "PAGE_SCAN_COMPLETED") {
+      setError("페이지 분석 응답을 확인하지 못했습니다."); setLoading(false); return;
+    }
+    await processScan(response.payload);
+  }
+
+  useEffect(() => {
+    void chrome.storage.local.get("pendingScan").then(async ({ pendingScan }) => {
+      if (!pendingScan) return;
+      await chrome.storage.local.remove("pendingScan");
+      setError(""); setLoading(true); setAnalysis(null);
+      await processScan(pendingScan as PageScanResult);
+    });
+  }, []);
 
   const critical = !incomplete && (result?.warnings.length || (analysis && analysis.risk_summary.score > 0));
   const detectedFields = new Map<string, string>();

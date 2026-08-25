@@ -61,7 +61,7 @@ async def analyze_consent_text(
 {request.service_function or "제공되지 않음"}
 
 분석 대상 동의서:
-{request.document_text}
+{request.document_text[:6000]}
 """
 
     retrieved_documents = await retriever.retrieve(
