@@ -59,7 +59,7 @@ describe("scanPage", () => {
       <input id="custom" name="profileQuestion" />`;
     const result = scanPage("request-aria");
     expect(result.fields[0]).toMatchObject({ category: "phone", requirement: "required" });
-    expect(result.fields[1]).toMatchObject({ category: "unknown", status: "needs_review" });
+    expect(result.fields).toHaveLength(1);
   });
 
   it("커스텀 체크박스를 동의 항목으로 탐지하고 숨김 필드를 제외한다", () => {

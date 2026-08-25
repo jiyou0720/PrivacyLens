@@ -1,3 +1,5 @@
+from collections import OrderedDict
+from hashlib import sha256
 from io import BytesIO
 from typing import Annotated
 
@@ -14,6 +16,10 @@ from .pipeline import analyze_consent_text
 from .rag.embeddings import OpenAIEmbeddingProvider
 from .rag.retriever import Retriever
 from .settings import Settings, get_settings
+
+_analysis_cache: OrderedDict[str, ConsentTextAnalysis] = OrderedDict()
+_ANALYSIS_CACHE_SIZE = 256
+
 
 app = FastAPI(
     title="PrivacyLens Analysis API",
@@ -52,20 +58,45 @@ def analyze(request: AnalyzeRequest) -> PolicyAnalysis:
     return analyze_policy(request)
 
 
+def _analysis_cache_key(request: ConsentTextAnalysisRequest, settings: Settings) -> str:
+    normalized = "\n".join(
+        [
+            settings.openai_model,
+            settings.prompt_version,
+            settings.rule_version,
+            request.service_name.strip(),
+            (request.service_function or "").strip(),
+            " ".join(request.document_text.split()),
+        ]
+    )
+    return sha256(normalized.encode("utf-8")).hexdigest()
+
+
 async def _run_analysis(
     request: ConsentTextAnalysisRequest,
     settings: Settings,
     provider: OpenAIProvider,
     retriever: Retriever,
 ) -> ConsentTextAnalysis:
+    cache_key = _analysis_cache_key(request, settings)
+    cached = _analysis_cache.get(cache_key)
+    if cached is not None:
+        _analysis_cache.move_to_end(cache_key)
+        return cached.model_copy(deep=True)
+
     try:
         await retriever.initialize()
-        return await analyze_consent_text(
+        result = await analyze_consent_text(
             request=request,
             provider=provider,
             settings=settings,
             retriever=retriever,
         )
+        _analysis_cache[cache_key] = result.model_copy(deep=True)
+        _analysis_cache.move_to_end(cache_key)
+        while len(_analysis_cache) > _ANALYSIS_CACHE_SIZE:
+            _analysis_cache.popitem(last=False)
+        return result
     except (httpx.HTTPError, ValidationError, KeyError, ValueError, RuntimeError) as exc:
         print(f"[ERROR] {type(exc).__name__}: {exc}")
         raise HTTPException(
@@ -103,8 +134,8 @@ async def analyze_file(
     settings: Annotated[Settings, Depends(get_settings)],
     provider: Annotated[OpenAIProvider, Depends(get_llm_provider)],
     retriever: Annotated[Retriever, Depends(get_retriever)],
+    file: Annotated[UploadFile, File()],
     service_function: Annotated[str | None, Form(max_length=1000)] = None,
-    file: UploadFile = File(...),
 ) -> ConsentTextAnalysis:
     content = await file.read(10_000_001)
     if len(content) > 10_000_000:

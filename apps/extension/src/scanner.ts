@@ -136,7 +136,8 @@ export function scanPage(requestId: string): PageScanResult {
         status,
         evidence: evidenceFor(control),
       };
-    });
+    })
+    .filter((field) => field.category !== "unknown");
 
   const customConsents = Array.from(document.querySelectorAll<HTMLElement>("[role='checkbox'], [aria-checked]"))
     .filter((element) => !(element instanceof HTMLInputElement))
