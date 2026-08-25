@@ -53,10 +53,27 @@ async function readLinkedDocuments(urls: string[], pageUrl: string): Promise<{ t
         statuses.push({ url, state: "format", message: "HTML 문서가 아님" });
         continue;
       }
-      const html = await response.text();
-      const document = new DOMParser().parseFromString(html, "text/html");
+      let html = await response.text();
+      let document = new DOMParser().parseFromString(html, "text/html");
       document.querySelectorAll("script, style, noscript, svg, nav, footer").forEach((node) => node.remove());
-      const text = (document.body?.innerText ?? document.body?.textContent ?? "").replace(/\s+/g, " ").trim();
+      let text = (document.body?.innerText || document.body?.textContent || "").replace(/\s+/g, " ").trim();
+
+      // 네이버 모바일 약관은 빈 컨테이너를 먼저 반환하고 type 번호에
+      // 해당하는 termN.html을 JavaScript로 다시 불러옵니다.
+      const parsedUrl = new URL(url);
+      if (text.length < 100 && parsedUrl.hostname === "policy.naver.com" && parsedUrl.pathname === "/policy-mobile/term.html") {
+        const type = parsedUrl.searchParams.get("type");
+        if (type && /^\d+$/.test(type)) {
+          const contentUrl = new URL(`/policy-mobile/term${type}.html`, parsedUrl);
+          const contentResponse = await fetch(contentUrl.href, { credentials: "include", signal: AbortSignal.timeout(8000) });
+          if (contentResponse.ok) {
+            html = await contentResponse.text();
+            document = new DOMParser().parseFromString(html, "text/html");
+            document.querySelectorAll("script, style, noscript, svg, nav, footer").forEach((node) => node.remove());
+            text = (document.body?.innerText || document.body?.textContent || "").replace(/\s+/g, " ").trim();
+          }
+        }
+      }
       if (text.length < 100) {
         statuses.push({ url, state: "empty", message: "분석할 본문이 없음" });
         continue;
