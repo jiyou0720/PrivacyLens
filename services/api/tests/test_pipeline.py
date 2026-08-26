@@ -93,6 +93,8 @@ def test_pipeline_marks_hallucinated_evidence_for_review() -> None:
         result.extracted.collected_items[0].necessity
         == Necessity.CONTEXT_REQUIRED
     )
+    assert result.risk_summary.score == 0
+    assert "명백한 위험 요소는 확인되지 않았습니다" in result.risk_summary.explanation
 
 def test_rag_query_is_bounded_for_long_documents() -> None:
     class RecordingRetriever(FakeRetriever):

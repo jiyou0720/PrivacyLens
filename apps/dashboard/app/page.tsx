@@ -8,6 +8,7 @@ import { ExportRecordsButton, RecordDetails } from "./RecordActions";
 
 const sourceLabel = { detected: "화면에서 탐지", user_confirmed: "사용자 확인", policy_stated: "처리방침 명시" };
 type AnalysisRecord = ServiceRecord & { riskLevel: string; requiresReview: boolean; result: ExtensionResult };
+const riskLabel = (level: string) => level === "LOW" ? "확인된 위험 낮음" : level;
 
 export default function Home() {
   const [records, setRecords] = useState<AnalysisRecord[]>([]);
@@ -70,7 +71,7 @@ export default function Home() {
         <div className="sectionTitle"><div><p className="eyebrow">MY RECORDS</p><h2>서비스별 제공 이력</h2></div><ExportRecordsButton records={records} /></div>
         {records.length === 0 ? <article className="record"><p>현재 세션에서 분석한 서비스가 없습니다.</p></article> : <div className="recordGrid">
           {records.map((record) => <article className="record" key={record.id}>
-            <div className="recordHead"><div className="logo">{record.serviceName[0]}</div><div><h3>{record.serviceName}</h3><p>{record.domain}</p></div><span className={record.riskLevel === "LOW" ? "lowBadge" : ["MEDIUM", "분석 불충분"].includes(record.riskLevel) ? "mediumBadge" : "criticalBadge"}>{record.riskLevel}</span></div>
+            <div className="recordHead"><div className="logo">{record.serviceName[0]}</div><div><h3>{record.serviceName}</h3><p>{record.domain}</p></div><span className={record.riskLevel === "LOW" ? "lowBadge" : ["MEDIUM", "분석 불충분"].includes(record.riskLevel) ? "mediumBadge" : "criticalBadge"}>{riskLabel(record.riskLevel)}</span></div>
             <div className="chips">{record.dataTypes.map((type) => <span key={type}>{type}</span>)}</div>
             <RecordDetails record={record} source={sourceLabel[record.source]} />
             <button type="button" onClick={() => setSelected({ ...record.result })}>분석 결과 다시 보기</button>

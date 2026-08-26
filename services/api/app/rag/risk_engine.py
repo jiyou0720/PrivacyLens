@@ -177,7 +177,13 @@ def build_risk_summary(
         unverified_evidence=unverified_evidence,
     )
 
-    if human_review:
+    if human_review and score == 0:
+        explanation = (
+            "현재 규칙에서 명백한 위험 요소는 확인되지 않았습니다. "
+            "다만 일부 항목의 적용 여부, 필수 여부 또는 수집 필요성은 "
+            "문서에서 명확하지 않아 확인이 필요합니다."
+        )
+    elif human_review:
         explanation = (
             "위험 점수와 별개로 근거 확인 또는 "
             "고위험 개인정보 처리에 대한 사람의 검토가 필요합니다."

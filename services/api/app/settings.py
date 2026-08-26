@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     openai_review_reasoning_effort: str = "low"
     openai_embedding_model: str = "text-embedding-3-small"
     prompt_version: str = "v4-low-latency-review"
-    rule_version: str = "consent-rules-v4"
+    rule_version: str = "consent-rules-v5"
 
     model_config = SettingsConfigDict(
         env_file=".env",
