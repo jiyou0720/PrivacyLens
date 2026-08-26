@@ -63,6 +63,11 @@ def merge_findings(
                 "affected_items": affected_items,
                 "evidence_text": evidence_text,
                 "confidence": confidence,
+                "score": max(existing.score, finding.score),
+                "severity": max(
+                    (existing.severity, finding.severity),
+                    key=lambda value: {"info": 0, "warning": 1, "high": 2}[value],
+                ),
             }
         )
 
@@ -79,12 +84,23 @@ def calculate_risk_score(
     법적 판단 점수가 아닌 제품용 초기 점수입니다.
     """
 
-    score = sum(
-        finding.score
-        for finding in findings
+    high_risk_rule_ids = {
+        "SPECIAL_DATA_REVIEW",
+        "UNIQUE_IDENTIFIER_REVIEW",
+        "THIRD_PARTY_PROVISION_MISSING",
+    }
+    high_risk_score = sum(
+        finding.score for finding in findings
+        if finding.rule_id in high_risk_rule_ids
+    )
+    disclosure_score = sum(
+        finding.score for finding in findings
+        if finding.rule_id not in high_risk_rule_ids
     )
 
-    return min(score, 100)
+    # 불완전한 화면 추출 때문에 단순 고지 누락만 누적되어
+    # 곧바로 CRITICAL이 되지 않도록 안내성 점수에 상한을 둡니다.
+    return min(high_risk_score + min(disclosure_score, 30), 100)
 
 
 def calculate_risk_level(
@@ -126,6 +142,7 @@ def check_human_review(
         if finding.rule_id in {
             "HIGH_RISK_IDENTIFIER",
             "SPECIAL_DATA_REVIEW",
+            "UNIQUE_IDENTIFIER_REVIEW",
         }:
             return True
 

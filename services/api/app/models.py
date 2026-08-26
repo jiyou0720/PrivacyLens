@@ -48,6 +48,11 @@ class PersonalDataItem(BaseModel):
     purpose: str | None = Field(default=None, max_length=500)
     mandatory: bool | None = None
     sensitive: bool = False
+    collection_context: str = Field(default="확인 필요", max_length=200)
+    applies_to_current_function: bool | None = None
+    scope_evidence: str | None = Field(default=None, max_length=1000)
+    separate_consent_present: bool | None = None
+    consent_evidence: str | None = Field(default=None, max_length=1000)
     unique_identifier: bool = False
     retention_period: str | None = Field(default=None, max_length=500)
     necessity: Necessity = Necessity.CONTEXT_REQUIRED
@@ -83,8 +88,18 @@ class RiskLevel(StrEnum):
     CRITICAL = "CRITICAL"
 
 
+class LegalBasis(BaseModel):
+    law_name: str
+    article: str
+    title: str
+    rationale: str
+    source_url: str
+
+
 class RuleFinding(BaseModel):
     rule_id: str
+
+    legal_bases: list[LegalBasis] = Field(default_factory=list)
 
     # 기존 Rule Engine의 심각도
     severity: RuleSeverity
@@ -129,6 +144,7 @@ class ConsentTextAnalysisRequest(BaseModel):
 class ConsentTextAnalysis(BaseModel):
     service_name: str
     model_name: str
+    review_model_name: str | None = None
     prompt_version: str
     rule_version: str
 

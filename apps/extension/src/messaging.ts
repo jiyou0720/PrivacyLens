@@ -10,7 +10,14 @@ export function createRequestId(): string {
 export async function requestPageScan(requestId = createRequestId()): Promise<ExtensionMessage> {
   await chrome.runtime.sendMessage({ type: "PAGE_SCAN_STARTED", requestId } satisfies ExtensionMessage).catch(() => undefined);
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const focusedTabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    const normalTabs = focusedTabs.length
+      ? focusedTabs
+      : await chrome.tabs.query({ active: true, windowType: "normal" });
+    const tab = normalTabs.find((candidate) => {
+      if (!candidate.url) return false;
+      try { return supportedProtocols.has(new URL(candidate.url).protocol); } catch { return false; }
+    }) ?? normalTabs[0];
     if (!tab.id) return failure(requestId, "NO_ACTIVE_TAB", "현재 활성 탭을 찾을 수 없습니다.");
     if (!tab.url || !supportedProtocols.has(new URL(tab.url).protocol)) {
       return failure(requestId, "UNSUPPORTED_PAGE", "이 페이지는 보안상 분석할 수 없습니다.");

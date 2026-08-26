@@ -3,6 +3,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { scanPage } from "./scanner";
 
 describe("scanPage", () => {
+  it("keeps consent text beyond 300 characters and reports page truncation", () => {
+    document.body.innerHTML = `<div class="privacy">${"가".repeat(500)} 회원 탈퇴 시 파기</div>`;
+    expect(scanPage("long").analysisText).toContain("회원 탈퇴 시 파기");
+    document.body.innerHTML = `<div class="privacy">${"가".repeat(21000)}</div>`;
+    expect(scanPage("clipped").analysisTruncated).toBe(true);
+  });
+
   beforeEach(() => {
     document.title = "PrivacyLens 샘플 회원가입";
     document.body.innerHTML = "";
@@ -73,6 +80,13 @@ describe("scanPage", () => {
     expect(result.consents).toHaveLength(2);
     expect(result.consents[0]).toMatchObject({ category: "privacy_collection", requirement: "required" });
     expect(result.consents[1]).toMatchObject({ category: "marketing", requirement: "optional", checkedByDefault: true });
+  });
+  it("같은 출처의 약관 및 개인정보 링크를 수집한다", () => {
+    document.body.innerHTML = `
+      <a href="/policy/privacy">개인정보 처리방침 보기</a>
+      <a href="https://external.example/terms">외부 약관</a>`;
+    const result = scanPage("request-documents");
+    expect(result.documentUrls).toEqual(["http://localhost:3000/policy/privacy", "https://external.example/terms"]);
   });
   it("이미 입력된 실제 값과 비밀번호를 결과 및 직렬화 데이터에 포함하지 않는다", () => {
     document.body.innerHTML = `

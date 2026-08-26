@@ -93,3 +93,49 @@ def test_pipeline_marks_hallucinated_evidence_for_review() -> None:
         result.extracted.collected_items[0].necessity
         == Necessity.CONTEXT_REQUIRED
     )
+
+def test_rag_query_is_bounded_for_long_documents() -> None:
+    class RecordingRetriever(FakeRetriever):
+        query_length = 0
+
+        async def retrieve(self, query: str, top_k: int = 3) -> list[str]:
+            self.query_length = len(query)
+            return await super().retrieve(query, top_k)
+
+    document = "회원 가입을 위해 이메일을 수집합니다. " * 3000
+    retriever = RecordingRetriever()
+    request = ConsentTextAnalysisRequest(
+        service_name="긴 약관",
+        document_text=document,
+    )
+    asyncio.run(analyze_consent_text(
+        request,
+        FakeProvider("이메일을 수집"),
+        Settings(),
+        retriever,
+    ))
+
+    assert retriever.query_length < 7000
+
+
+def test_unsupported_scope_and_consent_are_not_used_for_scoring() -> None:
+    class UnsupportedProvider(FakeProvider):
+        async def extract(self, document_text, service_function):
+            data = await super().extract(document_text, service_function)
+            item = data.collected_items[0]
+            item.sensitive = True
+            item.applies_to_current_function = True
+            item.scope_evidence = "원문에 없는 기능 범위"
+            item.separate_consent_present = False
+            item.consent_evidence = "동의 없이 수집한다는 존재하지 않는 문장"
+            return data
+
+    result = asyncio.run(analyze_consent_text(
+        ConsentTextAnalysisRequest(service_name="검증", document_text="회원 가입을 위해 이메일을 수집하며 회원 탈퇴 시까지 보유합니다."),
+        UnsupportedProvider("이메일을 수집"), Settings(), FakeRetriever(),
+    ))
+    item = result.extracted.collected_items[0]
+    assert item.applies_to_current_function is None
+    assert item.separate_consent_present is None
+    assert result.requires_human_review
+    assert all(f.score == 0 for f in result.findings if f.rule_id == "SPECIAL_DATA_REVIEW")

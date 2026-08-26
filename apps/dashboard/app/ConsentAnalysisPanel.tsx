@@ -5,7 +5,7 @@ import { FormEvent, useState } from "react";
 export type Analysis = {
   service_name: string;
   extracted: { collected_items: Array<{ original_name: string; normalized_name: string; necessity: string; reason: string; evidence_text: string }> };
-  findings: Array<{ rule_id: string; title: string; reason: string; recommendation: string }>;
+  findings: Array<{ rule_id: string; title: string; reason: string; recommendation: string; legal_bases: Array<{ law_name: string; article: string; title: string; rationale: string; source_url: string }> }>;
   risk_summary: { score: number; level: string; explanation: string };
 };
 
@@ -54,7 +54,7 @@ export default function ConsentAnalysisPanel({ onAnalyzed }: Props) {
     }
   }
 
-  const critical = analysis && ["HIGH", "CRITICAL"].includes(analysis.risk_summary.level);
+  const riskTone = analysis ? analysis.risk_summary.level === "LOW" ? "lowResult" : analysis.risk_summary.level === "MEDIUM" ? "mediumResult" : "criticalResult" : "";
 
   return (
     <section className="records">
@@ -67,12 +67,12 @@ export default function ConsentAnalysisPanel({ onAnalyzed }: Props) {
         <button type="submit" disabled={loading}>{loading ? "분석 중..." : "분석하기"}</button>
       </form>
       {error && <aside className="notice" role="alert"><strong>분석 실패</strong><p>{error}</p></aside>}
-      {analysis && <article className={`record analysisResult ${critical ? "criticalResult" : ""}`}>
-        <div className="recordHead"><div className="logo">{analysis.risk_summary.score}</div><div><h3>{analysis.service_name}</h3><p className={critical ? "criticalLevel" : undefined}>{analysis.risk_summary.level}</p></div></div>
+      {analysis && <article className={`record analysisResult ${riskTone}`}>
+        <div className="recordHead"><div className="logo">{analysis.risk_summary.score}</div><div><h3>{analysis.service_name}</h3><p className={`${riskTone}Level`}>{analysis.risk_summary.level}</p></div></div>
         <p>{analysis.risk_summary.explanation}</p>
         <div className="chips">{analysis.extracted.collected_items.map((item) => <span key={item.original_name}>{item.normalized_name}</span>)}</div>
         {analysis.extracted.collected_items.map((item) => <div className="resultItem" key={`${item.original_name}-${item.evidence_text}`}><strong>{item.original_name}</strong><p>{item.reason}</p><small>근거: {item.evidence_text}</small></div>)}
-        {analysis.findings.map((finding) => <div className="resultItem" key={finding.rule_id}><strong>{finding.title}</strong><p>{finding.reason}</p><small>권장: {finding.recommendation}</small></div>)}
+        {analysis.findings.map((finding) => <div className="resultItem" key={finding.rule_id}><strong>{finding.title}</strong><p>{finding.reason}</p><small>권장: {finding.recommendation}</small>{finding.legal_bases.map((basis) => <p key={`${finding.rule_id}-${basis.law_name}-${basis.article}`}><strong>{basis.law_name} {basis.article} · {basis.title}</strong><br /><small>핵심 요약: {basis.rationale}</small><br /><a href={basis.source_url} target="_blank" rel="noreferrer">해당 조문 원문 보기 →</a></p>)}</div>)}
       </article>}
     </section>
   );

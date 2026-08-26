@@ -7,6 +7,7 @@ const result: PageScanResult = {
   page: { domain: "example.com", url: "https://example.com/signup", title: "가입" },
   fields: [], consents: [], warnings: [],
   analysisText: "개인정보 수집 동의 테스트 문구입니다.",
+  documentUrls: [],
   privacy: { inputValuesCollected: false, fullHtmlCollected: false },
 };
 
@@ -26,6 +27,14 @@ describe("requestPageScan", () => {
     expect(chrome.runtime.sendMessage).toHaveBeenLastCalledWith(response);
   });
 
+  it("사이드 패널에서도 마지막 일반 브라우저 탭을 분석한다", async () => {
+    vi.mocked(chrome.tabs.query)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 9, url: "https://nid.naver.com/account/signup/term" } as chrome.tabs.Tab]);
+    const response = await requestPageScan("request-side-panel");
+    expect(response.type).toBe("PAGE_SCAN_COMPLETED");
+    expect(chrome.tabs.query).toHaveBeenLastCalledWith({ active: true, windowType: "normal" });
+  });
   it("Chrome 내부 페이지는 명시적인 실패 코드로 반환한다", async () => {
     vi.mocked(chrome.tabs.query).mockResolvedValue([
       { id: 8, url: "chrome://extensions" } as chrome.tabs.Tab,
