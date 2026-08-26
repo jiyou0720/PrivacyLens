@@ -54,7 +54,7 @@ export default function ConsentAnalysisPanel({ onAnalyzed }: Props) {
     }
   }
 
-  const critical = analysis && ["HIGH", "CRITICAL"].includes(analysis.risk_summary.level);
+  const riskTone = analysis ? analysis.risk_summary.level === "LOW" ? "lowResult" : analysis.risk_summary.level === "MEDIUM" ? "mediumResult" : "criticalResult" : "";
 
   return (
     <section className="records">
@@ -67,8 +67,8 @@ export default function ConsentAnalysisPanel({ onAnalyzed }: Props) {
         <button type="submit" disabled={loading}>{loading ? "분석 중..." : "분석하기"}</button>
       </form>
       {error && <aside className="notice" role="alert"><strong>분석 실패</strong><p>{error}</p></aside>}
-      {analysis && <article className={`record analysisResult ${critical ? "criticalResult" : ""}`}>
-        <div className="recordHead"><div className="logo">{analysis.risk_summary.score}</div><div><h3>{analysis.service_name}</h3><p className={critical ? "criticalLevel" : undefined}>{analysis.risk_summary.level}</p></div></div>
+      {analysis && <article className={`record analysisResult ${riskTone}`}>
+        <div className="recordHead"><div className="logo">{analysis.risk_summary.score}</div><div><h3>{analysis.service_name}</h3><p className={`${riskTone}Level`}>{analysis.risk_summary.level}</p></div></div>
         <p>{analysis.risk_summary.explanation}</p>
         <div className="chips">{analysis.extracted.collected_items.map((item) => <span key={item.original_name}>{item.normalized_name}</span>)}</div>
         {analysis.extracted.collected_items.map((item) => <div className="resultItem" key={`${item.original_name}-${item.evidence_text}`}><strong>{item.original_name}</strong><p>{item.reason}</p><small>근거: {item.evidence_text}</small></div>)}

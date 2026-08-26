@@ -177,7 +177,7 @@ function App() {
     });
   }, []);
 
-  const critical = !incomplete && (result?.warnings.length || (analysis && analysis.risk_summary.score > 0));
+  const riskTone = incomplete || !analysis ? "" : analysis.risk_summary.level === "LOW" ? "riskLow" : analysis.risk_summary.level === "MEDIUM" ? "riskMedium" : "riskHigh";
   const detectedFields = new Map<string, string>();
   analysis?.extracted.collected_items
     .filter((item) => !/비밀번호|password/i.test(`${item.original_name} ${item.normalized_name}`))
@@ -191,7 +191,7 @@ function App() {
     <header><strong>Privacy<span>Lens</span></strong><small>실제 입력값은 읽지 않아요</small></header>
     <section><p className="eyebrow">PAGE CHECK</p><h1>제공하기 전에<br />한번 더 확인하세요.</h1><button onClick={analyze} disabled={loading}>{loading ? "분석 중…" : "현재 페이지 분석"}</button></section>
     {error && <p className="error" role="alert">{error}</p>}
-    {result && <div className={`result ${critical ? "riskCritical" : ""}`}>
+    {result && <div className={`result ${riskTone}`}>
       <h2>{result.page.domain}</h2>
       {coverage && <p className="coverage">{coverage}</p>}
       {documentStatuses.length > 0 && <div className="documentStatuses">{documentStatuses.map((document) => <div key={document.url} className={document.state === "success" ? "documentOk" : "documentFail"}><strong>{document.message}</strong><span title={document.url}>{new URL(document.url).hostname}</span></div>)}</div>}
