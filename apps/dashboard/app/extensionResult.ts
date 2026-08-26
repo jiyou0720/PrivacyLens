@@ -6,6 +6,16 @@ export type ExtensionResult = {
   documentStatuses: Array<{ url: string; state: string; message: string }>;
 };
 
+export function decodeExtensionResultHash(encoded: string): string {
+  if (!encoded || encoded.length > 1_500_000 || !/^[A-Za-z0-9_-]+$/.test(encoded)) {
+    throw new Error("전달된 분석 결과 주소를 확인하지 못했습니다.");
+  }
+  const base64 = encoded.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(encoded.length / 4) * 4, "=");
+  const binary = atob(base64);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+}
+
 export function parseExtensionResult(raw: string): ExtensionResult {
   if (raw.length > 2_000_000) throw new Error("분석 결과가 너무 큽니다.");
   const value = JSON.parse(raw);

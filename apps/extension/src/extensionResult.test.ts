@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseExtensionResult, safeLegalUrl } from "../../dashboard/app/extensionResult";
+import { decodeExtensionResultHash, parseExtensionResult, safeLegalUrl } from "../../dashboard/app/extensionResult";
+import { encodeExtensionResult } from "./webResult";
 
 const payload = {
   version: 1, id: "8cd180d0-1ad4-4e89-bf75-85fb9897a38e", domain: "example.com",
@@ -14,6 +15,10 @@ const payload = {
 
 describe("extension result handoff", () => {
   it("accepts a complete result without re-analysis", () => expect(parseExtensionResult(JSON.stringify(payload))).toMatchObject({ domain: "example.com", analysis: { service_name: "예시" } }));
+  it("round-trips Korean result data through the local URL fragment", () => {
+    const encoded = encodeExtensionResult(payload);
+    expect(parseExtensionResult(decodeExtensionResultHash(encoded))).toMatchObject({ domain: "example.com", analysis: { service_name: "예시" } });
+  });
   it("rejects malformed results", () => expect(() => parseExtensionResult(JSON.stringify({ ...payload, analysis: { ...payload.analysis, risk_summary: { score: 101, level: "LOW", explanation: "x" } } }))).toThrow());
   it("only links to official law pages", () => {
     expect(safeLegalUrl("https://www.law.go.kr/법령/개인정보보호법/제15조")).toContain("law.go.kr");

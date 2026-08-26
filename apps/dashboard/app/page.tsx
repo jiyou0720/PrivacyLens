@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { parseExtensionResult, type ExtensionResult } from "./extensionResult";
+import { decodeExtensionResultHash, parseExtensionResult, type ExtensionResult } from "./extensionResult";
 import type { ServiceRecord } from "@privacylens/contracts";
 import ConsentAnalysisPanel, { type Analysis } from "./ConsentAnalysisPanel";
 import { ExportRecordsButton, RecordDetails } from "./RecordActions";
@@ -15,18 +15,15 @@ export default function Home() {
   const [importError, setImportError] = useState("");
   useEffect(() => {
     function receive() {
-      const match = /^#analysis=([a-f0-9-]{36})$/.exec(location.hash);
+      const match = /^#result=([A-Za-z0-9_-]+)$/.exec(location.hash);
       if (!match) return;
-      const key = `privacylens-result:${match[1]}`;
       try {
-        const raw = sessionStorage.getItem(key);
-        if (!raw) throw new Error("이 탭에 전달된 분석 결과가 없습니다. 확장에서 다시 열어주세요.");
+        const raw = decodeExtensionResultHash(match[1]);
         const result = parseExtensionResult(raw);
         setSelected(result); addRecord(result.analysis, result); setImportError("");
       } catch (error) {
         setImportError(error instanceof Error ? error.message : "결과를 불러오지 못했습니다.");
       } finally {
-        sessionStorage.removeItem(key);
         history.replaceState(null, "", location.pathname + location.search);
       }
     }
