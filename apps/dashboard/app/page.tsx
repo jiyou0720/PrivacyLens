@@ -73,8 +73,7 @@ export default function Home() {
           {records.map((record) => <article className="record" key={record.id}>
             <div className="recordHead"><div className="logo">{record.serviceName[0]}</div><div><h3>{record.serviceName}</h3><p>{record.domain}</p></div><span className={record.riskLevel === "LOW" ? "lowBadge" : ["MEDIUM", "분석 불충분"].includes(record.riskLevel) ? "mediumBadge" : "criticalBadge"}>{riskLabel(record.riskLevel)}</span></div>
             <div className="chips">{record.dataTypes.map((type) => <span key={type}>{type}</span>)}</div>
-            <RecordDetails record={record} source={sourceLabel[record.source]} />
-            <button type="button" onClick={() => setSelected({ ...record.result })}>분석 결과 다시 보기</button>
+            <RecordDetails record={record} source={sourceLabel[record.source]} onShowResult={() => setSelected({ ...record.result })} />
           </article>)}
         </div>}
       </section>
