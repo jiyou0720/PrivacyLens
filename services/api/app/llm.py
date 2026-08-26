@@ -66,6 +66,8 @@ class OpenAIProvider:
 
         self.model_name = settings.openai_model
         self.review_model = settings.openai_review_model
+        self.reasoning_effort = settings.openai_reasoning_effort
+        self.review_reasoning_effort = settings.openai_review_reasoning_effort
 
     async def extract(
         self,
@@ -94,6 +96,7 @@ class OpenAIProvider:
             instructions=SYSTEM_PROMPT,
             input=user_prompt,
             text_format=ExtractedConsent,
+            reasoning={"effort": self.reasoning_effort},
         )
 
         if response.output_parsed is None:
@@ -116,6 +119,7 @@ class OpenAIProvider:
                 input=user_prompt + "\n\n[검증할 1차 초안]\n"
                 + response.output_parsed.model_dump_json(),
                 text_format=ExtractedConsent,
+                reasoning={"effort": self.review_reasoning_effort},
             )
         except OpenAIError as exc:
             raise ValueError("Terra 재검증 요청이 실패했습니다.") from exc

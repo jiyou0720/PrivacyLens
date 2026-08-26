@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { safeLegalUrl, type ExtensionResult } from "./extensionResult";
 
 export type Analysis = {
   service_name: string;
@@ -9,9 +10,10 @@ export type Analysis = {
   risk_summary: { score: number; level: string; explanation: string };
 };
 
-type Props = { onAnalyzed: (analysis: Analysis) => void };
+type Props = { onAnalyzed: (analysis: Analysis) => void; selected?: ExtensionResult | null };
+const riskLabel = (level: string) => level === "LOW" ? "확인된 위험 낮음" : level;
 
-export default function ConsentAnalysisPanel({ onAnalyzed }: Props) {
+export default function ConsentAnalysisPanel({ onAnalyzed, selected }: Props) {
   const [serviceName, setServiceName] = useState("");
   const [serviceFunction, setServiceFunction] = useState("");
   const [documentText, setDocumentText] = useState("");
@@ -19,10 +21,14 @@ export default function ConsentAnalysisPanel({ onAnalyzed }: Props) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [source, setSource] = useState<ExtensionResult | null>(null);
+  useEffect(() => {
+    if (selected) { setAnalysis(selected.analysis); setSource(selected); setError(null); }
+  }, [selected]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null); setAnalysis(null); setLoading(true);
+    setError(null); setAnalysis(null); setSource(null); setLoading(true);
     try {
       let response: Response;
       if (file) {
@@ -54,7 +60,7 @@ export default function ConsentAnalysisPanel({ onAnalyzed }: Props) {
     }
   }
 
-  const riskTone = analysis ? analysis.risk_summary.level === "LOW" ? "lowResult" : analysis.risk_summary.level === "MEDIUM" ? "mediumResult" : "criticalResult" : "";
+  const riskTone = source?.incomplete ? "mediumResult" : analysis ? analysis.risk_summary.level === "LOW" ? "lowResult" : analysis.risk_summary.level === "MEDIUM" ? "mediumResult" : "criticalResult" : "";
 
   return (
     <section className="records">
@@ -68,11 +74,12 @@ export default function ConsentAnalysisPanel({ onAnalyzed }: Props) {
       </form>
       {error && <aside className="notice" role="alert"><strong>분석 실패</strong><p>{error}</p></aside>}
       {analysis && <article className={`record analysisResult ${riskTone}`}>
-        <div className="recordHead"><div className="logo">{analysis.risk_summary.score}</div><div><h3>{analysis.service_name}</h3><p className={`${riskTone}Level`}>{analysis.risk_summary.level}</p></div></div>
-        <p>{analysis.risk_summary.explanation}</p>
+        <div className="recordHead"><div className="logo">{source?.incomplete ? "—" : analysis.risk_summary.score}</div><div><h3>{analysis.service_name}</h3><p className={`${riskTone}Level`}>{source?.incomplete ? "분석 불충분" : riskLabel(analysis.risk_summary.level)}</p></div></div>
+        <p>{source?.incomplete ? "수집하지 못한 내용이 있어 위험 점수와 등급을 표시하지 않습니다." : analysis.risk_summary.explanation}</p>
+        {source && <div className="resultItem"><strong>{source.domain} · 확장 분석 결과</strong><p>{source.coverage} · 재분석 없이 불러옴</p>{source.documentStatuses.map((document, index) => <p key={`${document.url}-${index}`}>{document.message} · {document.url}</p>)}</div>}
         <div className="chips">{analysis.extracted.collected_items.map((item) => <span key={item.original_name}>{item.normalized_name}</span>)}</div>
         {analysis.extracted.collected_items.map((item) => <div className="resultItem" key={`${item.original_name}-${item.evidence_text}`}><strong>{item.original_name}</strong><p>{item.reason}</p><small>근거: {item.evidence_text}</small></div>)}
-        {analysis.findings.map((finding) => <div className="resultItem" key={finding.rule_id}><strong>{finding.title}</strong><p>{finding.reason}</p><small>권장: {finding.recommendation}</small>{finding.legal_bases.map((basis) => <p key={`${finding.rule_id}-${basis.law_name}-${basis.article}`}><strong>{basis.law_name} {basis.article} · {basis.title}</strong><br /><small>핵심 요약: {basis.rationale}</small><br /><a href={basis.source_url} target="_blank" rel="noreferrer">해당 조문 원문 보기 →</a></p>)}</div>)}
+        {analysis.findings.map((finding) => <div className="resultItem" key={finding.rule_id}><strong>{finding.title}</strong><p>{finding.reason}</p><small>권장: {finding.recommendation}</small>{finding.legal_bases.map((basis) => <p key={`${finding.rule_id}-${basis.law_name}-${basis.article}`}><strong>{basis.law_name} {basis.article} · {basis.title}</strong><br /><small>핵심 요약: {basis.rationale}</small><br /><a href={safeLegalUrl(basis.source_url)} target="_blank" rel="noreferrer">해당 조문 원문 보기 →</a></p>)}</div>)}
       </article>}
     </section>
   );

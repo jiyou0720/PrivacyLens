@@ -3,9 +3,12 @@ import { createRoot } from "react-dom/client";
 import type { PageScanResult } from "@privacylens/contracts";
 import { requestPageScan } from "./messaging";
 import { budgetDocuments } from "./documentBudget";
+import { fieldLabels } from "./fieldLabels";
+import { openWebResult } from "./webResult";
 import "./styles.css";
 
 const WEB_SERVICE_URL = "https://privacylens.site";
+const riskLabel = (level: string) => level === "LOW" ? "확인된 위험 낮음" : level;
 
 type Analysis = {
   service_name: string;
@@ -90,17 +93,13 @@ async function readLinkedDocuments(urls: string[], pageUrl: string): Promise<{ t
   }
   return { texts, attempted: urls.length, statuses };
 }
-const categoryLabel: Record<string, string> = {
-  name: "이름", email: "이메일", phone: "휴대전화번호", address: "주소",
-  birth_date: "생년월일", gender: "성별", nickname: "닉네임", location: "위치정보",
-  payment: "결제정보", identifier: "고유식별정보", password: "비밀번호 필드", unknown: "확인 필요",
-};
 
 function App() {
   const [result, setResult] = useState<PageScanResult | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [openingWeb, setOpeningWeb] = useState(false);
   const [coverage, setCoverage] = useState("");
   const [incomplete, setIncomplete] = useState(false);
   const [documentStatuses, setDocumentStatuses] = useState<DocumentStatus[]>([]);
@@ -190,14 +189,23 @@ function App() {
   }, []);
 
   const riskTone = incomplete || !analysis ? "" : analysis.risk_summary.level === "LOW" ? "riskLow" : analysis.risk_summary.level === "MEDIUM" ? "riskMedium" : "riskHigh";
-  const detectedFields = new Map<string, string>();
-  analysis?.extracted.collected_items
-    .filter((item) => !/비밀번호|password/i.test(`${item.original_name} ${item.normalized_name}`))
-    .forEach((item) => detectedFields.set(`${item.original_name}-${item.collection_context ?? ""}`, `${item.original_name} · ${item.collection_context ?? "동의문 명시"}${item.applies_to_current_function === false ? " (다른 기능)" : ""}`));
-  result?.fields.forEach((field) => {
-    const label = categoryLabel[field.category];
-    if (!detectedFields.has(label)) detectedFields.set(label, `${label} · ${field.requirement}`);
-  });
+  const detectedFields = fieldLabels(analysis?.extracted.collected_items ?? [], result?.fields ?? []);
+
+  async function showWebResult(event: React.MouseEvent<HTMLAnchorElement>) {
+    if (!analysis || !result) return;
+    event.preventDefault();
+    if (openingWeb) return;
+    setOpeningWeb(true);
+    try {
+      await openWebResult({
+        version: 1, id: result.requestId, analysis,
+        domain: result.page.domain, scannedAt: result.scannedAt,
+        coverage, incomplete, documentStatuses,
+      });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "결과 전달에 실패했습니다.");
+    } finally { setOpeningWeb(false); }
+  }
 
   return <main>
     <header><strong>Privacy<span>Lens</span></strong><small>실제 입력값은 읽지 않아요</small></header>
@@ -207,11 +215,11 @@ function App() {
       <h2>{result.page.domain}</h2>
       {coverage && <p className="coverage">{coverage}</p>}
       {documentStatuses.length > 0 && <div className="documentStatuses">{documentStatuses.map((document) => <div key={document.url} className={document.state === "success" ? "documentOk" : "documentFail"}><strong>{document.message}</strong><span title={document.url}>{new URL(document.url).hostname}</span></div>)}</div>}
-      {analysis && incomplete ? <div className="risk insufficient"><strong>분석 불충분</strong><p>원문 수집 실패 또는 길이·문서 수 제한으로 일부 내용이 빠져 위험 점수와 등급을 표시하지 않습니다.</p></div> : analysis && <div className="risk"><strong>{analysis.risk_summary.level}</strong><span>위험 점수 {analysis.risk_summary.score}</span><p>{analysis.risk_summary.explanation}</p></div>}
+      {analysis && incomplete ? <div className="risk insufficient"><strong>분석 불충분</strong><p>원문 수집 실패 또는 길이·문서 수 제한으로 일부 내용이 빠져 위험 점수와 등급을 표시하지 않습니다.</p></div> : analysis && <div className="risk"><strong>{riskLabel(analysis.risk_summary.level)}</strong><span>규칙 기반 위험 점수 {analysis.risk_summary.score}</span><p>{analysis.risk_summary.explanation}</p></div>}
       <label>탐지된 개인정보 필드</label><div className="chips">{detectedFields.size ? Array.from(detectedFields.entries()).map(([key, text]) => <span key={key}>{text}</span>) : <em>탐지된 항목 없음</em>}</div>
       <label>동의 항목</label><p>{result.consents.length}개 탐지 · 기본 선택 경고 {result.warnings.length}건</p>
       {analysis && !incomplete && analysis.findings.some((finding) => finding.legal_bases.length) && <><label>관련 법령 근거</label><div className="legalBases">{analysis.findings.flatMap((finding) => finding.legal_bases.map((basis) => <a key={`${finding.rule_id}-${basis.law_name}-${basis.article}`} href={basis.source_url} target="_blank" rel="noreferrer"><strong>{basis.law_name} {basis.article}</strong><span>{basis.title}</span><p><b>핵심 요약</b> {basis.rationale}</p><em>해당 조문 원문 보기 →</em></a>))}</div></>}
-      <a className="webLink" href={WEB_SERVICE_URL} target="_blank" rel="noreferrer">웹서비스에서 자세히 보기</a>
+      <a className="webLink" href={WEB_SERVICE_URL} target="_blank" rel="noreferrer" onClick={showWebResult} aria-disabled={openingWeb}>{openingWeb ? "결과 전달 중…" : "웹서비스에서 자세히 보기"}</a>
       <footer>요청 ID {result.requestId.slice(0, 12)}…</footer>
     </div>}
     <aside>분석 결과는 법률 판단이 아닌 확인 보조 정보입니다.</aside>

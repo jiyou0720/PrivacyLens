@@ -180,12 +180,37 @@ export function scanPage(requestId: string): PageScanResult {
       }]
     : [];
 
+  // Generic "보기" links are usually navigation/content, not consent documents.
+  // Keep these helpers inside scanPage because Chrome serializes its body.
+  const policyScore = (text: string): number => {
+    if (/개인정보|개인위치정보|privacy|수집\s*[·ㆍ및/]*\s*이용|제\s*3\s*자/i.test(text)) return 3;
+    if (/약관|이용\s*동의|terms?|policy|위치기반서비스/i.test(text)) return 2;
+    return 0;
+  };
   const documentUrls = Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]"))
-    .filter((link) => /개인정보|약관|동의|privacy|policy|terms|보기/i.test(`${link.textContent ?? ""} ${link.href}`))
-    .map((link) => link.href)
-    .filter((url) => {
-      try { return ["http:", "https:"].includes(new URL(url).protocol); } catch { return false; }
+    .map((link) => {
+      let url: URL;
+      try { url = new URL(link.href); } catch { return null; }
+      if (!["http:", "https:"].includes(url.protocol)) return null;
+      const current = new URL(location.href);
+      if (url.origin === current.origin && url.pathname === current.pathname && url.search === current.search) return null;
+      const label = normalize(`${link.textContent ?? ""} ${link.getAttribute("aria-label") ?? ""} ${link.title}`);
+      let path = `${url.pathname} ${url.search}`;
+      try { path = decodeURIComponent(path); } catch { /* malformed escape */ }
+      let score = Math.max(policyScore(label), policyScore(path));
+      if (!score && /^(보기|더\s*보기|자세히\s*보기|전문\s*보기|view|details)$/i.test(label.trim())) {
+        const container = link.closest("label, li, p, td, [role='group'], div");
+        const context = visibleTextWithoutControls(container, true);
+        // A small consent row is useful context; an entire page is not.
+        if (context.length <= 400 && (container?.querySelectorAll("a[href]").length ?? 0) <= 2) {
+          score = policyScore(context);
+        }
+      }
+      return score ? { url: url.href, score } : null;
     })
+    .filter((candidate): candidate is { url: string; score: number } => candidate !== null)
+    .sort((a, b) => b.score - a.score)
+    .map((candidate) => candidate.url)
     .filter((url, index, urls) => urls.indexOf(url) === index);
   const analysisParts = [
     document.title,

@@ -3,6 +3,28 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { scanPage } from "./scanner";
 
 describe("scanPage", () => {
+  it("ignores content view links but retains consent-row view links and prioritizes privacy", () => {
+    document.body.innerHTML = `
+      <a href="https://video.example/watch">보기</a>
+      <div>인기 작품 <a href="/episode/1">더 보기</a></div>
+      <a href="/terms">이용약관</a>
+      <li>개인정보 수집 및 이용 <a href="/document?id=2">보기</a></li>
+      <a href="/privacy">개인정보 처리방침</a>
+      <a href="/privacy">개인정보 처리방침</a>
+      <a href="#privacy">개인정보</a>
+      <a href="javascript:void(0)">약관</a>
+      <a href="http://[">약관</a>`;
+    expect(scanPage("links").documentUrls).toEqual([
+      "http://localhost:3000/document?id=2", "http://localhost:3000/privacy", "http://localhost:3000/terms",
+    ]);
+  });
+
+  it("does not use an entire navigation area as context for generic links", () => {
+    document.body.innerHTML = `<div>개인정보 처리방침
+      <a href="/content/1">보기</a><a href="/content/2">보기</a><a href="/content/3">보기</a>
+    </div>`;
+    expect(scanPage("navigation").documentUrls).toEqual([]);
+  });
   it("keeps consent text beyond 300 characters and reports page truncation", () => {
     document.body.innerHTML = `<div class="privacy">${"가".repeat(500)} 회원 탈퇴 시 파기</div>`;
     expect(scanPage("long").analysisText).toContain("회원 탈퇴 시 파기");
