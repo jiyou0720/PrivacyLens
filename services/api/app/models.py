@@ -144,6 +144,7 @@ class ConsentTextAnalysisRequest(BaseModel):
 class ConsentTextAnalysis(BaseModel):
     service_name: str
     model_name: str
+    review_model_name: str | None = None
     prompt_version: str
     rule_version: str
 

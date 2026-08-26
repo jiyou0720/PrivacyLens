@@ -62,6 +62,7 @@ def _analysis_cache_key(request: ConsentTextAnalysisRequest, settings: Settings)
     normalized = "\n".join(
         [
             settings.openai_model,
+            settings.openai_review_model,
             settings.prompt_version,
             settings.rule_version,
             request.service_name.strip(),

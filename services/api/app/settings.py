@@ -6,8 +6,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     openai_api_key: str
     openai_model: str = "gpt-5.6-luna"
+    openai_review_model: str = "gpt-5.6-terra"
     openai_embedding_model: str = "text-embedding-3-small"
-    prompt_version: str = "v2-context"
+    prompt_version: str = "v3-terra-review"
     rule_version: str = "consent-rules-v4"
 
     model_config = SettingsConfigDict(

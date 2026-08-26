@@ -172,6 +172,7 @@ async def analyze_consent_text(
     return ConsentTextAnalysis(
         service_name=request.service_name,
         model_name=provider.model_name,
+        review_model_name=getattr(provider, "review_model", None) or None,
         prompt_version=settings.prompt_version,
         rule_version=settings.rule_version,
 
