@@ -5,7 +5,7 @@ export async function openWebResult(payload: unknown) {
   const serialized = JSON.stringify(payload);
   if (serialized.length > 2_000_000) throw new Error("전달할 분석 결과가 너무 큽니다.");
   const id = crypto.randomUUID();
-  const existing = await chrome.tabs.query({ url: WEB_URL, currentWindow: true });
+  const existing = await chrome.tabs.query({ url: `${WEB_URL}*`, currentWindow: true });
   const tab = existing[0] ?? await chrome.tabs.create({ url: WEB_URL, active: false });
   if (tab.id === undefined) throw new Error("웹 결과 탭을 열지 못했습니다.");
   const tabId = tab.id;
@@ -22,10 +22,15 @@ export async function openWebResult(payload: unknown) {
   });
   const results = await chrome.scripting.executeScript({
     target: { tabId },
+    // sessionStorage must be written in the page's world so the dashboard can
+    // consume it. The default isolated world is intentionally separate.
+    world: "MAIN",
     func: (key: string, value: string) => {
       if (location.origin !== "https://privacylens.site") throw new Error("결과 전달 대상 주소가 다릅니다.");
       sessionStorage.setItem(`privacylens-result:${key}`, value);
-      location.hash = `analysis=${key}`;
+      const nextHash = `analysis=${key}`;
+      if (location.hash === `#${nextHash}`) location.hash = "";
+      location.hash = nextHash;
       return true;
     },
     args: [id, serialized],
