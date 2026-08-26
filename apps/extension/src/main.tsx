@@ -2,22 +2,23 @@ import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { PageScanResult } from "@privacylens/contracts";
 import { requestPageScan } from "./messaging";
+import { budgetDocuments } from "./documentBudget";
 import "./styles.css";
 
 const WEB_SERVICE_URL = "https://privacylens.site";
 
 type Analysis = {
   service_name: string;
-  extracted: { collected_items: Array<{ original_name: string; normalized_name: string }> };
+  extracted: { collected_items: Array<{ original_name: string; normalized_name: string; collection_context?: string; applies_to_current_function?: boolean | null }> };
   findings: Array<{ rule_id: string; legal_bases: Array<{ law_name: string; article: string; title: string; rationale: string; source_url: string }> }>;
   risk_summary: { score: number; level: string; explanation: string };
 };
 
-type DocumentStatus = { url: string; state: "success" | "permission" | "http" | "format" | "empty" | "failed"; message: string };
+type DocumentStatus = { url: string; state: "success" | "partial" | "permission" | "http" | "format" | "empty" | "failed"; message: string };
 type SavedView = { result: PageScanResult; analysis: Analysis | null; error: string; coverage: string; incomplete: boolean; documentStatuses: DocumentStatus[] };
 let restoreStarted = false;
 
-async function readLinkedDocuments(urls: string[], pageUrl: string): Promise<{ texts: string[]; attempted: number; statuses: DocumentStatus[] }> {
+async function readLinkedDocuments(urls: string[], pageUrl: string): Promise<{ texts: Array<{ url: string; text: string }>; attempted: number; statuses: DocumentStatus[] }> {
   const pageOrigin = new URL(pageUrl).origin;
   const candidates = urls.slice(0, 8);
   const requestedOrigins = Array.from(new Set(candidates
@@ -32,7 +33,7 @@ async function readLinkedDocuments(urls: string[], pageUrl: string): Promise<{ t
     if (granted) allowedOrigins = new Set(requestedOrigins.map((origin) => origin.slice(0, -2)));
   }
   const statuses: DocumentStatus[] = [];
-  const texts: string[] = [];
+  const texts: Array<{ url: string; text: string }> = [];
   for (const url of candidates) {
     let permitted = false;
     try {
@@ -78,13 +79,16 @@ async function readLinkedDocuments(urls: string[], pageUrl: string): Promise<{ t
         statuses.push({ url, state: "empty", message: "분석할 본문이 없음" });
         continue;
       }
-      texts.push(`[연결 문서: ${url}]\n${text.slice(0, 15000)}`);
-      statuses.push({ url, state: "success", message: "반영 완료" });
+      texts.push({ url, text });
+      statuses.push({ url, state: "success", message: "본문 수집 완료" });
     } catch {
       statuses.push({ url, state: "failed", message: "요청 실패 또는 시간 초과" });
     }
   }
-  return { texts, attempted: candidates.length, statuses };
+  for (const url of urls.slice(8)) {
+    statuses.push({ url, state: "partial", message: "문서 수 제한으로 미반영" });
+  }
+  return { texts, attempted: urls.length, statuses };
 }
 const categoryLabel: Record<string, string> = {
   name: "이름", email: "이메일", phone: "휴대전화번호", address: "주소",
@@ -117,10 +121,18 @@ function App() {
     try {
       await chrome.storage.local.set({ pendingScan: scan });
       const linked = await readLinkedDocuments(scan.documentUrls ?? [], scan.page.url);
-      const nextCoverage = linked.attempted ? `연결 문서 ${linked.texts.length}/${linked.attempted}개 반영` : "현재 화면 기준 분석";
-      const nextIncomplete = linked.attempted > linked.texts.length;
+      const budget = budgetDocuments(scan.analysisText, linked.texts);
+      for (const status of linked.statuses) {
+        if (budget.clippedUrls.includes(status.url)) {
+          status.state = "partial";
+          status.message = "길이 제한으로 일부 또는 전체 미반영";
+        }
+      }
+      const completeCount = linked.statuses.filter((status) => status.state === "success").length;
+      const nextCoverage = linked.attempted ? `연결 문서 ${completeCount}/${linked.attempted}개 본문 반영` : "현재 화면 기준 분석";
+      const nextIncomplete = linked.attempted > completeCount || budget.truncated || Boolean(scan.analysisTruncated);
       setCoverage(nextCoverage); setIncomplete(nextIncomplete); setDocumentStatuses(linked.statuses);
-      const documentText = [scan.analysisText, ...linked.texts].join("\n\n").slice(0, 60000);
+      const documentText = budget.text;
       if (linked.attempted > 0 && linked.texts.length === 0) {
         const message = "연결된 약관 원문을 읽지 못해 정확한 위험 점수를 계산할 수 없습니다. 분석 불충분 상태입니다.";
         setError(message);
@@ -131,7 +143,7 @@ function App() {
       const apiResponse = await fetch(`${WEB_SERVICE_URL}/api/v1/analyses/text`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ service_name: scan.page.title || scan.page.domain, service_function: "현재 페이지의 개인정보 입력 및 동의", document_text: documentText }),
+        body: JSON.stringify({ service_name: scan.page.title || scan.page.domain, service_function: `현재 페이지: ${scan.page.title}. 현재 화면의 개인정보 입력 및 동의만 평가하고, 연결 문서의 다른 기능은 구분하세요.`.slice(0, 1000), document_text: documentText }),
       });
       const payload = await apiResponse.json().catch(() => null);
       if (!apiResponse.ok) throw new Error(payload?.detail ?? `AI 분석 요청이 실패했습니다. (${apiResponse.status})`);
@@ -181,7 +193,7 @@ function App() {
   const detectedFields = new Map<string, string>();
   analysis?.extracted.collected_items
     .filter((item) => !/비밀번호|password/i.test(`${item.original_name} ${item.normalized_name}`))
-    .forEach((item) => detectedFields.set(item.original_name, `${item.original_name} · 동의문 명시`));
+    .forEach((item) => detectedFields.set(`${item.original_name}-${item.collection_context ?? ""}`, `${item.original_name} · ${item.collection_context ?? "동의문 명시"}${item.applies_to_current_function === false ? " (다른 기능)" : ""}`));
   result?.fields.forEach((field) => {
     const label = categoryLabel[field.category];
     if (!detectedFields.has(label)) detectedFields.set(label, `${label} · ${field.requirement}`);
@@ -195,7 +207,7 @@ function App() {
       <h2>{result.page.domain}</h2>
       {coverage && <p className="coverage">{coverage}</p>}
       {documentStatuses.length > 0 && <div className="documentStatuses">{documentStatuses.map((document) => <div key={document.url} className={document.state === "success" ? "documentOk" : "documentFail"}><strong>{document.message}</strong><span title={document.url}>{new URL(document.url).hostname}</span></div>)}</div>}
-      {analysis && incomplete ? <div className="risk insufficient"><strong>분석 불충분</strong><p>연결된 약관 일부를 읽지 못해 위험 점수와 등급을 표시하지 않습니다.</p></div> : analysis && <div className="risk"><strong>{analysis.risk_summary.level}</strong><span>위험 점수 {analysis.risk_summary.score}</span><p>{analysis.risk_summary.explanation}</p></div>}
+      {analysis && incomplete ? <div className="risk insufficient"><strong>분석 불충분</strong><p>원문 수집 실패 또는 길이·문서 수 제한으로 일부 내용이 빠져 위험 점수와 등급을 표시하지 않습니다.</p></div> : analysis && <div className="risk"><strong>{analysis.risk_summary.level}</strong><span>위험 점수 {analysis.risk_summary.score}</span><p>{analysis.risk_summary.explanation}</p></div>}
       <label>탐지된 개인정보 필드</label><div className="chips">{detectedFields.size ? Array.from(detectedFields.entries()).map(([key, text]) => <span key={key}>{text}</span>) : <em>탐지된 항목 없음</em>}</div>
       <label>동의 항목</label><p>{result.consents.length}개 탐지 · 기본 선택 경고 {result.warnings.length}건</p>
       {analysis && !incomplete && analysis.findings.some((finding) => finding.legal_bases.length) && <><label>관련 법령 근거</label><div className="legalBases">{analysis.findings.flatMap((finding) => finding.legal_bases.map((basis) => <a key={`${finding.rule_id}-${basis.law_name}-${basis.article}`} href={basis.source_url} target="_blank" rel="noreferrer"><strong>{basis.law_name} {basis.article}</strong><span>{basis.title}</span><p><b>핵심 요약</b> {basis.rationale}</p><em>해당 조문 원문 보기 →</em></a>))}</div></>}

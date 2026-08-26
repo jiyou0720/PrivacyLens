@@ -24,7 +24,7 @@ def test_rules_report_missing_required_notices() -> None:
     } <= ids
 
 
-def test_sensitive_item_requires_high_review() -> None:
+def test_sensitive_item_requires_review_without_automatic_high_risk() -> None:
     data = ExtractedConsent(
         purposes=["본인 확인"],
         retention_period="회원 탈퇴 시까지",
@@ -51,7 +51,8 @@ def test_sensitive_item_requires_high_review() -> None:
         if finding.rule_id == "SPECIAL_DATA_REVIEW"
     )
 
-    assert finding.severity == "high"
+    assert finding.severity == "warning"
+    assert finding.score == 0
 
 def test_findings_include_legal_bases() -> None:
     findings = evaluate_rules(ExtractedConsent())

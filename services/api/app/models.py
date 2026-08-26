@@ -48,6 +48,11 @@ class PersonalDataItem(BaseModel):
     purpose: str | None = Field(default=None, max_length=500)
     mandatory: bool | None = None
     sensitive: bool = False
+    collection_context: str = Field(default="확인 필요", max_length=200)
+    applies_to_current_function: bool | None = None
+    scope_evidence: str | None = Field(default=None, max_length=1000)
+    separate_consent_present: bool | None = None
+    consent_evidence: str | None = Field(default=None, max_length=1000)
     unique_identifier: bool = False
     retention_period: str | None = Field(default=None, max_length=500)
     necessity: Necessity = Necessity.CONTEXT_REQUIRED

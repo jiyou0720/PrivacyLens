@@ -63,6 +63,11 @@ def merge_findings(
                 "affected_items": affected_items,
                 "evidence_text": evidence_text,
                 "confidence": confidence,
+                "score": max(existing.score, finding.score),
+                "severity": max(
+                    (existing.severity, finding.severity),
+                    key=lambda value: {"info": 0, "warning": 1, "high": 2}[value],
+                ),
             }
         )
 
@@ -137,6 +142,7 @@ def check_human_review(
         if finding.rule_id in {
             "HIGH_RISK_IDENTIFIER",
             "SPECIAL_DATA_REVIEW",
+            "UNIQUE_IDENTIFIER_REVIEW",
         }:
             return True
 

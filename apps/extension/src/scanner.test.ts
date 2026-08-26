@@ -3,6 +3,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { scanPage } from "./scanner";
 
 describe("scanPage", () => {
+  it("keeps consent text beyond 300 characters and reports page truncation", () => {
+    document.body.innerHTML = `<div class="privacy">${"가".repeat(500)} 회원 탈퇴 시 파기</div>`;
+    expect(scanPage("long").analysisText).toContain("회원 탈퇴 시 파기");
+    document.body.innerHTML = `<div class="privacy">${"가".repeat(21000)}</div>`;
+    expect(scanPage("clipped").analysisTruncated).toBe(true);
+  });
+
   beforeEach(() => {
     document.title = "PrivacyLens 샘플 회원가입";
     document.body.innerHTML = "";

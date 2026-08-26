@@ -110,6 +110,18 @@ async def analyze_consent_text(
 
     for item in extracted.collected_items:
 
+        # Scope and consent assertions need literal source evidence.
+        for field, evidence_field in (
+            ("applies_to_current_function", "scope_evidence"),
+            ("separate_consent_present", "consent_evidence"),
+        ):
+            evidence = getattr(item, evidence_field)
+            if getattr(item, field) is not None and (
+                not evidence or _normalize(evidence) not in source
+            ):
+                setattr(item, field, None)
+                extracted.requires_human_review = True
+
         if not _evidence_is_supported(item.evidence_text, source):
 
             unverified.append(

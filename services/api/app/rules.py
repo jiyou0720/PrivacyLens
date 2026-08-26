@@ -14,7 +14,7 @@ UNIQUE_IDENTIFIER_KEYWORDS = (
     "외국인등록번호",
 )
 
-RULE_VERSION = "consent-rules-v3"
+RULE_VERSION = "consent-rules-v4"
 
 PIPA_URL = "https://www.law.go.kr/법령/개인정보보호법"
 PIPA_DECREE_URL = "https://www.law.go.kr/법령/개인정보보호법시행령"
@@ -115,7 +115,14 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
             score=0,
         )
 
-    if not data.retention_period:
+    relevant_items = [
+        item for item in data.collected_items
+        if item.applies_to_current_function is not False
+    ]
+    item_retention_complete = bool(relevant_items) and all(
+        item.retention_period for item in relevant_items
+    )
+    if not data.retention_period and not item_retention_complete:
         add_finding(
             rule_id="RETENTION_MISSING",
             severity=RuleSeverity.WARNING,
@@ -152,7 +159,10 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
     # 2. 보유기간
     # ============================================================
 
-    retention = (data.retention_period or "").replace(" ", "")
+    retention_text = data.retention_period or " / ".join(
+        item.retention_period for item in relevant_items if item.retention_period
+    )
+    retention = retention_text.replace(" ", "")
 
     if retention and any(
         token.replace(" ", "") in retention
@@ -166,7 +176,7 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
             reason="개인정보의 보유 종료 시점을 구체적으로 확인하기 어렵습니다.",
             recommendation="개인정보의 보유기간 또는 파기 시점을 구체적으로 명시하세요.",
             score=20,
-            evidence_text=data.retention_period,
+            evidence_text=retention_text,
         )
 
     # ============================================================
@@ -174,12 +184,21 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
     # ============================================================
 
     for item in data.collected_items:
+        if item.applies_to_current_function is False or item.confidence == 0:
+            continue
         normalized = item.original_name.replace(" ", "")
+
+        substantiated_concern = (
+            item.applies_to_current_function is True
+            and bool(item.scope_evidence)
+            and item.separate_consent_present is False
+            and bool(item.consent_evidence)
+        )
 
         if item.sensitive:
             add_finding(
                 rule_id="SPECIAL_DATA_REVIEW",
-                severity=RuleSeverity.HIGH,
+                severity=RuleSeverity.HIGH if substantiated_concern else RuleSeverity.WARNING,
                 category="민감정보",
                 title="민감정보 수집 검토 필요",
                 reason=(
@@ -190,7 +209,7 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
                     "민감정보 수집이 필요한지 확인하고, "
                     "필요한 경우 별도의 동의 및 고지 여부를 검토하세요."
                 ),
-                score=35,
+                score=35 if substantiated_concern else 0,
                 evidence_text=item.evidence_text,
                 affected_items=[item.original_name],
                 confidence=item.confidence,
@@ -207,7 +226,7 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
         if is_unique_identifier:
             add_finding(
                 rule_id="UNIQUE_IDENTIFIER_REVIEW",
-                severity=RuleSeverity.HIGH,
+                severity=RuleSeverity.HIGH if substantiated_concern else RuleSeverity.WARNING,
                 category="고유식별정보",
                 title="고유식별정보 수집 검토 필요",
                 reason=(
@@ -218,7 +237,7 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
                     "해당 식별정보의 수집 필요성과 처리 근거를 확인하고 "
                     "불필요한 경우 수집하지 않도록 검토하세요."
                 ),
-                score=40,
+                score=40 if substantiated_concern else 0,
                 evidence_text=item.evidence_text,
                 affected_items=[item.original_name],
                 confidence=item.confidence,
@@ -228,15 +247,18 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
     # 4. 제3자 제공
     # ============================================================
 
-    if data.third_party_provision_present is False:
+    # Presence alone does not establish defective disclosure. Until the
+    # recipient/purpose/items/period/consent evidence is modeled, review only.
+    if data.third_party_provision_present is True:
         add_finding(
             rule_id="THIRD_PARTY_PROVISION_MISSING",
             severity=RuleSeverity.WARNING,
             category="제3자 제공",
             title="제3자 제공 내용 확인 필요",
-            reason="제3자 제공 여부 또는 관련 고지를 확인하지 못했습니다.",
+            reason="제3자 제공이 언급되어 관련 고지와 처리 근거의 확인이 필요합니다.",
             recommendation="제3자 제공이 있는 경우 제공받는 자, 목적, 항목 등을 명확하게 고지하세요.",
-            score=25,
+            score=0,
+            confidence=0.5,
         )
 
     # ============================================================

@@ -25,11 +25,11 @@ export function scanPage(requestId: string): PageScanResult {
     return explicitId ? `${prefix}-${explicitId.replace(/[^a-zA-Z0-9_-]/g, "-")}` : `${prefix}-${index + 1}`;
   };
 
-  const visibleTextWithoutControls = (element: Element | null): string => {
+  const visibleTextWithoutControls = (element: Element | null, full = false): string => {
     if (!element) return "";
     const clone = element.cloneNode(true) as HTMLElement;
     clone.querySelectorAll("input, textarea, select, script, style").forEach((node) => node.remove());
-    return normalize(clone.textContent);
+    return full ? (clone.textContent ?? "").replace(/\s+/g, " ").trim() : normalize(clone.textContent);
   };
 
   const labelText = (control: FormControl): string => {
@@ -186,20 +186,19 @@ export function scanPage(requestId: string): PageScanResult {
     .filter((url) => {
       try { return ["http:", "https:"].includes(new URL(url).protocol); } catch { return false; }
     })
-    .filter((url, index, urls) => urls.indexOf(url) === index)
-    .slice(0, 8);
+    .filter((url, index, urls) => urls.indexOf(url) === index);
   const analysisParts = [
     document.title,
     ...fields.flatMap((field) => [field.evidence.label, field.evidence.nearbyText]),
     ...consents.map((consent) => consent.title),
     ...Array.from(document.querySelectorAll<HTMLElement>(
       "[class*=privacy i], [id*=privacy i], [class*=consent i], [id*=consent i], [class*=agree i], [id*=agree i]",
-    )).map((element) => visibleTextWithoutControls(element)),
+    )).map((element) => visibleTextWithoutControls(element, true)),
   ].filter((part): part is string => Boolean(part));
-  const analysisText = Array.from(new Set(analysisParts))
+  const fullAnalysisText = Array.from(new Set(analysisParts))
     .join("\n")
-    .replace(/\s+\n/g, "\n")
-    .slice(0, 20_000);
+    .replace(/\s+\n/g, "\n");
+  const analysisText = fullAnalysisText.slice(0, 20_000);
 
   return {
     schemaVersion: "1.0",
@@ -210,6 +209,7 @@ export function scanPage(requestId: string): PageScanResult {
     consents,
     warnings,
     analysisText,
+    analysisTruncated: fullAnalysisText.length > analysisText.length,
     documentUrls,
     privacy: { inputValuesCollected: false, fullHtmlCollected: false },
   };
