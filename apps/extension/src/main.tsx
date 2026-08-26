@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import type { PageScanResult } from "@privacylens/contracts";
 import { requestPageScan } from "./messaging";
 import { budgetDocuments } from "./documentBudget";
+import { fieldLabels } from "./fieldLabels";
 import "./styles.css";
 
 const WEB_SERVICE_URL = "https://privacylens.site";
@@ -90,11 +91,6 @@ async function readLinkedDocuments(urls: string[], pageUrl: string): Promise<{ t
   }
   return { texts, attempted: urls.length, statuses };
 }
-const categoryLabel: Record<string, string> = {
-  name: "이름", email: "이메일", phone: "휴대전화번호", address: "주소",
-  birth_date: "생년월일", gender: "성별", nickname: "닉네임", location: "위치정보",
-  payment: "결제정보", identifier: "고유식별정보", password: "비밀번호 필드", unknown: "확인 필요",
-};
 
 function App() {
   const [result, setResult] = useState<PageScanResult | null>(null);
@@ -190,14 +186,7 @@ function App() {
   }, []);
 
   const riskTone = incomplete || !analysis ? "" : analysis.risk_summary.level === "LOW" ? "riskLow" : analysis.risk_summary.level === "MEDIUM" ? "riskMedium" : "riskHigh";
-  const detectedFields = new Map<string, string>();
-  analysis?.extracted.collected_items
-    .filter((item) => !/비밀번호|password/i.test(`${item.original_name} ${item.normalized_name}`))
-    .forEach((item) => detectedFields.set(`${item.original_name}-${item.collection_context ?? ""}`, `${item.original_name} · ${item.collection_context ?? "동의문 명시"}${item.applies_to_current_function === false ? " (다른 기능)" : ""}`));
-  result?.fields.forEach((field) => {
-    const label = categoryLabel[field.category];
-    if (!detectedFields.has(label)) detectedFields.set(label, `${label} · ${field.requirement}`);
-  });
+  const detectedFields = fieldLabels(analysis?.extracted.collected_items ?? [], result?.fields ?? []);
 
   return <main>
     <header><strong>Privacy<span>Lens</span></strong><small>실제 입력값은 읽지 않아요</small></header>
