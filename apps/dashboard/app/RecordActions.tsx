@@ -5,7 +5,8 @@ import type { ServiceRecord } from "@privacylens/contracts";
 
 export function ExportRecordsButton({ records }: { records: ServiceRecord[] }) {
   function download() {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(records, null, 2)], { type: "application/json" }));
+    const exported = records.map(({ id, serviceName, domain, recordedAt, dataTypes, optionalConsent, source }) => ({ id, serviceName, domain, recordedAt, dataTypes, optionalConsent, source }));
+    const url = URL.createObjectURL(new Blob([JSON.stringify(exported, null, 2)], { type: "application/json" }));
     const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = "privacylens-records.json";

@@ -7,8 +7,10 @@ class Settings(BaseSettings):
     openai_api_key: str
     openai_model: str = "gpt-5.6-luna"
     openai_review_model: str = "gpt-5.6-terra"
+    openai_reasoning_effort: str = "low"
+    openai_review_reasoning_effort: str = "low"
     openai_embedding_model: str = "text-embedding-3-small"
-    prompt_version: str = "v3-terra-review"
+    prompt_version: str = "v4-low-latency-review"
     rule_version: str = "consent-rules-v4"
 
     model_config = SettingsConfigDict(

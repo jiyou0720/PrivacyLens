@@ -1,31 +1,61 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { parseExtensionResult, type ExtensionResult } from "./extensionResult";
 import type { ServiceRecord } from "@privacylens/contracts";
 import ConsentAnalysisPanel, { type Analysis } from "./ConsentAnalysisPanel";
 import { ExportRecordsButton, RecordDetails } from "./RecordActions";
 
 const sourceLabel = { detected: "화면에서 탐지", user_confirmed: "사용자 확인", policy_stated: "처리방침 명시" };
-type AnalysisRecord = ServiceRecord & { riskLevel: string; requiresReview: boolean };
+type AnalysisRecord = ServiceRecord & { riskLevel: string; requiresReview: boolean; result: ExtensionResult };
 
 export default function Home() {
   const [records, setRecords] = useState<AnalysisRecord[]>([]);
+  const [selected, setSelected] = useState<ExtensionResult | null>(null);
+  const [importError, setImportError] = useState("");
+  useEffect(() => {
+    function receive() {
+      const match = /^#analysis=([a-f0-9-]{36})$/.exec(location.hash);
+      if (!match) return;
+      const key = `privacylens-result:${match[1]}`;
+      try {
+        const raw = sessionStorage.getItem(key);
+        if (!raw) throw new Error("이 탭에 전달된 분석 결과가 없습니다. 확장에서 다시 열어주세요.");
+        const result = parseExtensionResult(raw);
+        setSelected(result); addRecord(result.analysis, result); setImportError("");
+      } catch (error) {
+        setImportError(error instanceof Error ? error.message : "결과를 불러오지 못했습니다.");
+      } finally {
+        sessionStorage.removeItem(key);
+        history.replaceState(null, "", location.pathname + location.search);
+      }
+    }
+    receive();
+    window.addEventListener("hashchange", receive);
+    return () => window.removeEventListener("hashchange", receive);
+  }, []);
   const dataTypeCount = new Set(records.flatMap((record) => record.dataTypes)).size;
   const reviewCount = records.filter((record) => record.requiresReview).length;
 
-  function addRecord(analysis: Analysis) {
+  function addRecord(analysis: Analysis, imported?: ExtensionResult) {
+    const result: ExtensionResult = imported ?? {
+      version: 1, id: crypto.randomUUID(), analysis, domain: "직접 분석한 동의문",
+      scannedAt: new Date().toISOString(), coverage: "직접 입력·업로드 분석",
+      incomplete: false, documentStatuses: [],
+    };
     const record: AnalysisRecord = {
-      id: `${Date.now()}-${crypto.randomUUID()}`,
+      id: result.id,
       serviceName: analysis.service_name,
-      domain: "직접 분석한 동의문",
-      recordedAt: new Date().toISOString(),
-      dataTypes: analysis.extracted.collected_items.map((item) => item.normalized_name),
+      domain: result.domain,
+      recordedAt: result.scannedAt,
+      dataTypes: Array.from(new Set(analysis.extracted.collected_items.map((item) => item.normalized_name))),
       optionalConsent: "not_applicable",
       source: "policy_stated",
-      riskLevel: analysis.risk_summary.level,
-      requiresReview: ["HIGH", "CRITICAL"].includes(analysis.risk_summary.level),
+      riskLevel: result.incomplete ? "분석 불충분" : analysis.risk_summary.level,
+      requiresReview: result.incomplete || ["HIGH", "CRITICAL"].includes(analysis.risk_summary.level),
+      result,
     };
-    setRecords((current) => [record, ...current]);
+    setRecords((current) => [record, ...current.filter((item) => item.id !== record.id)]);
   }
 
   return (
@@ -37,14 +67,16 @@ export default function Home() {
         <article><span>제공 정보 유형</span><strong>{dataTypeCount}</strong><small>개</small></article>
         <article><span>확인 필요 항목</span><strong className="accent">{reviewCount}</strong><small>건</small></article>
       </section>
-      <ConsentAnalysisPanel onAnalyzed={addRecord} />
+      {importError && <aside className="notice" role="alert">{importError}</aside>}
+      <ConsentAnalysisPanel onAnalyzed={addRecord} selected={selected} />
       <section className="records">
         <div className="sectionTitle"><div><p className="eyebrow">MY RECORDS</p><h2>서비스별 제공 이력</h2></div><ExportRecordsButton records={records} /></div>
         {records.length === 0 ? <article className="record"><p>현재 세션에서 분석한 서비스가 없습니다.</p></article> : <div className="recordGrid">
           {records.map((record) => <article className="record" key={record.id}>
-            <div className="recordHead"><div className="logo">{record.serviceName[0]}</div><div><h3>{record.serviceName}</h3><p>{record.domain}</p></div><span className={record.riskLevel === "LOW" ? "lowBadge" : record.riskLevel === "MEDIUM" ? "mediumBadge" : "criticalBadge"}>{record.riskLevel}</span></div>
+            <div className="recordHead"><div className="logo">{record.serviceName[0]}</div><div><h3>{record.serviceName}</h3><p>{record.domain}</p></div><span className={record.riskLevel === "LOW" ? "lowBadge" : ["MEDIUM", "분석 불충분"].includes(record.riskLevel) ? "mediumBadge" : "criticalBadge"}>{record.riskLevel}</span></div>
             <div className="chips">{record.dataTypes.map((type) => <span key={type}>{type}</span>)}</div>
             <RecordDetails record={record} source={sourceLabel[record.source]} />
+            <button type="button" onClick={() => setSelected({ ...record.result })}>분석 결과 다시 보기</button>
           </article>)}
         </div>}
       </section>

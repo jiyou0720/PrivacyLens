@@ -4,6 +4,7 @@ import type { PageScanResult } from "@privacylens/contracts";
 import { requestPageScan } from "./messaging";
 import { budgetDocuments } from "./documentBudget";
 import { fieldLabels } from "./fieldLabels";
+import { openWebResult } from "./webResult";
 import "./styles.css";
 
 const WEB_SERVICE_URL = "https://privacylens.site";
@@ -97,6 +98,7 @@ function App() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [openingWeb, setOpeningWeb] = useState(false);
   const [coverage, setCoverage] = useState("");
   const [incomplete, setIncomplete] = useState(false);
   const [documentStatuses, setDocumentStatuses] = useState<DocumentStatus[]>([]);
@@ -188,6 +190,22 @@ function App() {
   const riskTone = incomplete || !analysis ? "" : analysis.risk_summary.level === "LOW" ? "riskLow" : analysis.risk_summary.level === "MEDIUM" ? "riskMedium" : "riskHigh";
   const detectedFields = fieldLabels(analysis?.extracted.collected_items ?? [], result?.fields ?? []);
 
+  async function showWebResult(event: React.MouseEvent<HTMLAnchorElement>) {
+    if (!analysis || !result) return;
+    event.preventDefault();
+    if (openingWeb) return;
+    setOpeningWeb(true);
+    try {
+      await openWebResult({
+        version: 1, id: result.requestId, analysis,
+        domain: result.page.domain, scannedAt: result.scannedAt,
+        coverage, incomplete, documentStatuses,
+      });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "결과 전달에 실패했습니다.");
+    } finally { setOpeningWeb(false); }
+  }
+
   return <main>
     <header><strong>Privacy<span>Lens</span></strong><small>실제 입력값은 읽지 않아요</small></header>
     <section><p className="eyebrow">PAGE CHECK</p><h1>제공하기 전에<br />한번 더 확인하세요.</h1><button onClick={analyze} disabled={loading}>{loading ? "분석 중…" : "현재 페이지 분석"}</button></section>
@@ -200,7 +218,7 @@ function App() {
       <label>탐지된 개인정보 필드</label><div className="chips">{detectedFields.size ? Array.from(detectedFields.entries()).map(([key, text]) => <span key={key}>{text}</span>) : <em>탐지된 항목 없음</em>}</div>
       <label>동의 항목</label><p>{result.consents.length}개 탐지 · 기본 선택 경고 {result.warnings.length}건</p>
       {analysis && !incomplete && analysis.findings.some((finding) => finding.legal_bases.length) && <><label>관련 법령 근거</label><div className="legalBases">{analysis.findings.flatMap((finding) => finding.legal_bases.map((basis) => <a key={`${finding.rule_id}-${basis.law_name}-${basis.article}`} href={basis.source_url} target="_blank" rel="noreferrer"><strong>{basis.law_name} {basis.article}</strong><span>{basis.title}</span><p><b>핵심 요약</b> {basis.rationale}</p><em>해당 조문 원문 보기 →</em></a>))}</div></>}
-      <a className="webLink" href={WEB_SERVICE_URL} target="_blank" rel="noreferrer">웹서비스에서 자세히 보기</a>
+      <a className="webLink" href={WEB_SERVICE_URL} target="_blank" rel="noreferrer" onClick={showWebResult} aria-disabled={openingWeb}>{openingWeb ? "결과 전달 중…" : "웹서비스에서 자세히 보기"}</a>
       <footer>요청 ID {result.requestId.slice(0, 12)}…</footer>
     </div>}
     <aside>분석 결과는 법률 판단이 아닌 확인 보조 정보입니다.</aside>
