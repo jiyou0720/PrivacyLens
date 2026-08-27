@@ -32,6 +32,7 @@ export default function ConsentAnalysisPanel({ onAnalyzed, selected }: Props) {
     try {
       let response: Response;
       if (file) {
+        if (file.size > 10_000_000) throw new Error("파일은 10MB 이하만 업로드할 수 있습니다.");
         const body = new FormData();
         body.append("service_name", serviceName.trim());
         body.append("service_function", serviceFunction.trim());
@@ -49,7 +50,10 @@ export default function ConsentAnalysisPanel({ onAnalyzed, selected }: Props) {
         });
       }
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.detail ?? "분석 요청을 처리하지 못했습니다.");
+      if (!response.ok) {
+        if (response.status === 413) throw new Error("파일 용량이 서버 업로드 한도를 초과했습니다. 10MB 이하 파일을 사용해 주세요.");
+        throw new Error(payload?.detail ?? `분석 요청을 처리하지 못했습니다. (HTTP ${response.status})`);
+      }
       const result = payload as Analysis;
       setAnalysis(result);
       onAnalyzed(result);
@@ -68,7 +72,7 @@ export default function ConsentAnalysisPanel({ onAnalyzed, selected }: Props) {
       <form className="record analysisForm" onSubmit={submit}>
         <label>서비스 이름<input required maxLength={100} value={serviceName} onChange={(event) => setServiceName(event.target.value)} /></label>
         <label>서비스 기능<input maxLength={1000} value={serviceFunction} onChange={(event) => setServiceFunction(event.target.value)} /></label>
-        <label>동의문 파일 (TXT, MD, PDF)<input type="file" accept=".txt,.md,.pdf,text/plain,application/pdf" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>
+        <label>동의문 파일 (TXT, MD, PDF · 최대 10MB)<input type="file" accept=".txt,.md,.pdf,text/plain,application/pdf" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>
         <label>개인정보 동의문<textarea required={!file} minLength={file ? undefined : 20} maxLength={100000} disabled={Boolean(file)} value={documentText} onChange={(event) => setDocumentText(event.target.value)} placeholder={file ? "선택한 파일의 내용을 분석합니다." : undefined} /></label>
         <button type="submit" disabled={loading}>{loading ? "분석 중..." : "분석하기"}</button>
       </form>
