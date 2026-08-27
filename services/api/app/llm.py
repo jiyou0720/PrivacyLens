@@ -69,6 +69,20 @@ class OpenAIProvider:
         self.reasoning_effort = settings.openai_reasoning_effort
         self.review_reasoning_effort = settings.openai_review_reasoning_effort
 
+    @staticmethod
+    def _needs_terra_review(extracted: ExtractedConsent) -> bool:
+        """Use the slower second pass only for materially high-risk candidates."""
+        unique_identifier_keywords = ("주민등록번호", "여권번호", "운전면허번호", "외국인등록번호")
+        return bool(
+            extracted.third_party_provision_present
+            or any(
+                item.sensitive
+                or item.unique_identifier
+                or any(keyword in item.original_name.replace(" ", "") for keyword in unique_identifier_keywords)
+                for item in extracted.collected_items
+            )
+        )
+
     async def extract(
         self,
         document_text: str,
@@ -102,7 +116,7 @@ class OpenAIProvider:
         if response.output_parsed is None:
             raise ValueError("OpenAI에서 구조화된 분석 결과를 받지 못했습니다.")
 
-        if not self.review_model:
+        if not self.review_model or not self._needs_terra_review(response.output_parsed):
             return response.output_parsed
 
         # Re-read the source, not only the draft, so review can correct omissions.
