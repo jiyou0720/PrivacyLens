@@ -78,6 +78,10 @@ export default function Home() {
         </div>}
       </section>
       <aside className="notice"><strong>Privacy by Design</strong><p>PrivacyLens는 입력한 이메일, 전화번호, 이름 등의 실제 값을 읽거나 저장하지 않습니다.</p></aside>
+      <footer className="siteFooter">
+        <span>© 2026 PrivacyLens</span>
+        <a href="/privacy">개인정보처리방침</a>
+      </footer>
     </main>
   );
 }

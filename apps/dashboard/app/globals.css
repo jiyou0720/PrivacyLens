@@ -25,3 +25,4 @@ h1 { margin:0; max-width:760px; font-size:clamp(42px,6vw,78px); line-height:1.08
 .resultItem a{color:var(--green);font-weight:700;text-decoration:none}
 
 .policyHome{color:var(--green);font-size:13px;font-weight:700;text-decoration:none}.policyPage{max-width:900px;margin:0 auto;padding:72px max(6vw,24px) 100px}.policyPage h1{font-size:clamp(38px,5vw,58px);letter-spacing:-3px}.policyUpdated{margin:18px 0 42px;color:#77877e;font-size:14px}.policyPage h2{margin:42px 0 14px;font-size:22px;letter-spacing:-1px}.policyPage p,.policyPage li{color:#4f6258;font-size:15px;line-height:1.85}.policyPage ul{padding-left:22px}.policyPage a{color:var(--green);font-weight:700}
+.siteFooter{display:flex;align-items:center;justify-content:space-between;padding:24px max(6vw,24px);border-top:1px solid var(--line);color:#77877e;font-size:12px}.siteFooter a{color:var(--green);font-weight:700;text-decoration:none}.siteFooter a:hover{text-decoration:underline}
