@@ -65,8 +65,7 @@ export default function ConsentAnalysisPanel({ onAnalyzed, selected }: Props) {
     }
   }
 
-  const reviewOnly = Boolean(analysis && analysis.risk_summary.score === 0 && (analysis.risk_summary.requires_human_review || analysis.requires_human_review));
-  const riskTone = source?.incomplete || reviewOnly ? "mediumResult" : analysis ? analysis.risk_summary.level === "LOW" ? "lowResult" : analysis.risk_summary.level === "MEDIUM" ? "mediumResult" : "criticalResult" : "";
+  const riskTone = source?.incomplete ? "mediumResult" : analysis ? analysis.risk_summary.level === "LOW" ? "lowResult" : analysis.risk_summary.level === "MEDIUM" ? "mediumResult" : "criticalResult" : "";
 
   return (
     <section className="records">
@@ -80,7 +79,7 @@ export default function ConsentAnalysisPanel({ onAnalyzed, selected }: Props) {
       </form>
       {error && <aside className="notice" role="alert"><strong>분석 실패</strong><p>{error}</p></aside>}
       {analysis && <article className={`record analysisResult ${riskTone}`}>
-        <div className="recordHead"><div className="logo">{source?.incomplete ? "—" : analysis.risk_summary.score}</div><div><h3>{analysis.service_name}</h3><p className={`${riskTone}Level`}>{source?.incomplete ? "분석 불충분" : reviewOnly ? "검토 필요" : riskLabel(analysis.risk_summary.level)}</p></div></div>
+        <div className="recordHead"><div className="logo">{source?.incomplete ? "—" : analysis.risk_summary.score}</div><div><h3>{analysis.service_name}</h3><p className={`${riskTone}Level`}>{source?.incomplete ? "분석 불충분" : riskLabel(analysis.risk_summary.level)}</p></div></div>
         <p>{source?.incomplete ? "수집하지 못한 내용이 있어 위험 점수와 등급을 표시하지 않습니다." : analysis.risk_summary.explanation}</p>
         {source && <div className="resultItem"><strong>{source.domain} · 확장 분석 결과</strong><p>{source.coverage} · 재분석 없이 불러옴</p>{source.documentStatuses.map((document, index) => <p key={`${document.url}-${index}`}>{document.message} · {document.url}</p>)}</div>}
         <div className="chips">{analysis.extracted.collected_items.map((item) => <span key={item.original_name}>{item.normalized_name}</span>)}</div>

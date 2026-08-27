@@ -41,8 +41,7 @@ export default function Home() {
       scannedAt: new Date().toISOString(), coverage: "직접 입력·업로드 분석",
       incomplete: false, documentStatuses: [],
     };
-    const requiresReview = result.incomplete || Boolean(analysis.risk_summary.requires_human_review || analysis.requires_human_review) || ["HIGH", "CRITICAL"].includes(analysis.risk_summary.level);
-    const reviewOnly = !result.incomplete && analysis.risk_summary.score === 0 && requiresReview;
+    const requiresReview = result.incomplete || analysis.risk_summary.score >= 20;
     const record: AnalysisRecord = {
       id: result.id,
       serviceName: analysis.service_name,
@@ -51,7 +50,7 @@ export default function Home() {
       dataTypes: Array.from(new Set(analysis.extracted.collected_items.map((item) => item.normalized_name))),
       optionalConsent: "not_applicable",
       source: "policy_stated",
-      riskLevel: result.incomplete ? "분석 불충분" : reviewOnly ? "검토 필요" : analysis.risk_summary.level,
+      riskLevel: result.incomplete ? "분석 불충분" : analysis.risk_summary.level,
       requiresReview,
       result,
     };
@@ -73,7 +72,7 @@ export default function Home() {
         <div className="sectionTitle"><div><p className="eyebrow">MY RECORDS</p><h2>서비스별 제공 이력</h2></div><ExportRecordsButton records={records} /></div>
         {records.length === 0 ? <article className="record"><p>현재 세션에서 분석한 서비스가 없습니다.</p></article> : <div className="recordGrid">
           {records.map((record) => <article className="record" key={record.id}>
-            <div className="recordHead"><div className="logo">{record.serviceName[0]}</div><div><h3>{record.serviceName}</h3><p>{record.domain}</p></div><span className={record.riskLevel === "LOW" ? "lowBadge" : ["MEDIUM", "분석 불충분", "검토 필요"].includes(record.riskLevel) ? "mediumBadge" : "criticalBadge"}>{riskLabel(record.riskLevel)}</span></div>
+            <div className="recordHead"><div className="logo">{record.serviceName[0]}</div><div><h3>{record.serviceName}</h3><p>{record.domain}</p></div><span className={record.riskLevel === "LOW" ? "lowBadge" : ["MEDIUM", "분석 불충분"].includes(record.riskLevel) ? "mediumBadge" : "criticalBadge"}>{riskLabel(record.riskLevel)}</span></div>
             <div className="chips">{record.dataTypes.map((type) => <span key={type}>{type}</span>)}</div>
             <RecordDetails record={record} source={sourceLabel[record.source]} onShowResult={() => setSelected({ ...record.result })} />
           </article>)}
