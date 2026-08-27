@@ -14,7 +14,23 @@ UNIQUE_IDENTIFIER_KEYWORDS = (
     "외국인등록번호",
 )
 
-RULE_VERSION = "consent-rules-v4"
+SENSITIVE_DATA_KEYWORDS = (
+    "민감정보",
+    "건강",
+    "장애",
+    "질병",
+    "병력",
+    "유전",
+    "성생활",
+    "사상",
+    "신념",
+    "정치적견해",
+    "노동조합",
+    "범죄경력",
+    "생체정보",
+)
+
+RULE_VERSION = "consent-rules-v5"
 
 PIPA_URL = "https://www.law.go.kr/법령/개인정보보호법"
 PIPA_DECREE_URL = "https://www.law.go.kr/법령/개인정보보호법시행령"
@@ -204,10 +220,14 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
             and item.separate_consent_present is False
             and bool(item.consent_evidence)
         )
-        unresolved_separate_consent = (
+        unresolved_for_current_function = (
             item.applies_to_current_function is True
             and bool(item.scope_evidence)
             and item.separate_consent_present is not True
+        )
+        explicitly_sensitive = any(
+            keyword in f"{normalized}{item.evidence_text.replace(' ', '')}"
+            for keyword in SENSITIVE_DATA_KEYWORDS
         )
 
         if item.sensitive:
@@ -224,7 +244,12 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
                     "민감정보 수집이 필요한지 확인하고, "
                     "필요한 경우 별도의 동의 및 고지 여부를 검토하세요."
                 ),
-                score=35 if substantiated_concern else 20 if unresolved_separate_consent else 0,
+                score=(
+                    35 if substantiated_concern
+                    else 20 if item.separate_consent_present is not True
+                    and (unresolved_for_current_function or explicitly_sensitive)
+                    else 0
+                ),
                 evidence_text=item.evidence_text,
                 affected_items=[item.original_name],
                 confidence=item.confidence,
@@ -252,7 +277,12 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
                     "해당 식별정보의 수집 필요성과 처리 근거를 확인하고 "
                     "불필요한 경우 수집하지 않도록 검토하세요."
                 ),
-                score=40 if substantiated_concern else 25 if unresolved_separate_consent else 0,
+                score=(
+                    40 if substantiated_concern
+                    else 25 if item.separate_consent_present is not True
+                    and (unresolved_for_current_function or is_unique_identifier)
+                    else 0
+                ),
                 evidence_text=item.evidence_text,
                 affected_items=[item.original_name],
                 confidence=item.confidence,
@@ -262,8 +292,9 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
     # 4. 제3자 제공
     # ============================================================
 
-    # Presence alone does not establish defective disclosure. Until the
-    # recipient/purpose/items/period/consent evidence is modeled, review only.
+    # Presence alone does not establish an unlawful disclosure. It does,
+    # however, warrant a small review score until the recipient, purpose,
+    # items, retention period and consent evidence are confirmed.
     if data.third_party_provision_present is True:
         add_finding(
             rule_id="THIRD_PARTY_PROVISION_MISSING",
@@ -272,7 +303,7 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
             title="제3자 제공 내용 확인 필요",
             reason="제3자 제공이 언급되어 관련 고지와 처리 근거의 확인이 필요합니다.",
             recommendation="제3자 제공이 있는 경우 제공받는 자, 목적, 항목 등을 명확하게 고지하세요.",
-            score=0,
+            score=10,
             confidence=0.5,
         )
 
