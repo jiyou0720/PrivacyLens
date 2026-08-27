@@ -52,7 +52,7 @@ def test_sensitive_item_requires_review_without_automatic_high_risk() -> None:
     )
 
     assert finding.severity == "warning"
-    assert finding.score == 0
+    assert finding.score == 20
 
 def test_findings_include_legal_bases() -> None:
     findings = evaluate_rules(ExtractedConsent())

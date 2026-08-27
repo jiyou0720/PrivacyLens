@@ -15,9 +15,9 @@ def special(data):
     return [f for f in evaluate_rules(data) if f.rule_id == "SPECIAL_DATA_REVIEW"]
 
 
-def test_sensitive_mention_does_not_add_risk():
+def test_sensitive_mention_without_confirmed_separate_consent_adds_review_risk():
     findings = special(ExtractedConsent(collected_items=[item()]))
-    assert findings and findings[0].score == 0
+    assert findings and findings[0].score == 20
 
 
 def test_current_sensitive_data_without_confirmed_separate_consent_adds_risk():
@@ -54,6 +54,12 @@ def test_explicit_concern_is_not_lost_when_merging():
 def test_no_third_party_provision_is_not_a_missing_notice():
     findings = evaluate_rules(ExtractedConsent(third_party_provision_present=False))
     assert not any(f.rule_id == "THIRD_PARTY_PROVISION_MISSING" for f in findings)
+
+
+def test_third_party_provision_adds_review_score():
+    findings = evaluate_rules(ExtractedConsent(third_party_provision_present=True))
+    finding = next(f for f in findings if f.rule_id == "THIRD_PARTY_PROVISION_MISSING")
+    assert finding.score == 10
 
 
 def test_item_level_retention_is_recognized():
