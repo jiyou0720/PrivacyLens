@@ -59,6 +59,16 @@ LEGAL_BASES: dict[str, list[LegalBasis]] = {
 def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
     findings: list[RuleFinding] = []
 
+    def with_subject(value: str) -> str:
+        """Attach the Korean subject particle that matches the final syllable."""
+        if not value:
+            return value
+        last = value[-1]
+        if "가" <= last <= "힣":
+            has_batchim = (ord(last) - ord("가")) % 28 != 0
+            return f"{value}{'은' if has_batchim else '는'}"
+        return f"{value}은"
+
     def add_finding(
         *,
         rule_id: str,
@@ -194,6 +204,11 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
             and item.separate_consent_present is False
             and bool(item.consent_evidence)
         )
+        unresolved_separate_consent = (
+            item.applies_to_current_function is True
+            and bool(item.scope_evidence)
+            and item.separate_consent_present is not True
+        )
 
         if item.sensitive:
             add_finding(
@@ -202,14 +217,14 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
                 category="민감정보",
                 title="민감정보 수집 검토 필요",
                 reason=(
-                    f"{item.original_name}이 민감정보로 분류되어 "
+                    f"{with_subject(item.original_name)} 민감정보로 분류되어 "
                     "별도 동의 및 수집 필요성에 대한 검토가 필요합니다."
                 ),
                 recommendation=(
                     "민감정보 수집이 필요한지 확인하고, "
                     "필요한 경우 별도의 동의 및 고지 여부를 검토하세요."
                 ),
-                score=35 if substantiated_concern else 0,
+                score=35 if substantiated_concern else 20 if unresolved_separate_consent else 0,
                 evidence_text=item.evidence_text,
                 affected_items=[item.original_name],
                 confidence=item.confidence,
@@ -230,14 +245,14 @@ def evaluate_rules(data: ExtractedConsent) -> list[RuleFinding]:
                 category="고유식별정보",
                 title="고유식별정보 수집 검토 필요",
                 reason=(
-                    f"{item.original_name}은 고유식별정보에 해당할 가능성이 있어 "
+                    f"{with_subject(item.original_name)} 고유식별정보에 해당할 가능성이 있어 "
                     "수집 근거와 별도 처리 여부를 검토해야 합니다."
                 ),
                 recommendation=(
                     "해당 식별정보의 수집 필요성과 처리 근거를 확인하고 "
                     "불필요한 경우 수집하지 않도록 검토하세요."
                 ),
-                score=40 if substantiated_concern else 0,
+                score=40 if substantiated_concern else 25 if unresolved_separate_consent else 0,
                 evidence_text=item.evidence_text,
                 affected_items=[item.original_name],
                 confidence=item.confidence,
