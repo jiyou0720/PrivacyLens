@@ -58,7 +58,7 @@ export default function PrivacyPolicy() {
         <p>서비스 기능이나 관련 법령이 변경되면 이 방침을 수정할 수 있으며, 중요한 변경 사항은 서비스 또는 확장 프로그램을 통해 안내합니다.</p>
 
         <h2>8. 문의</h2>
-        <p>개인정보 관련 문의: <a href="mailto:jiyou060720@gmail.com">jiyou060720@gmail.com</a></p>
+        <p>개인정보 관련 문의: <a href="mailto:jiyou.0720.cs@gmail.com">jiyou.0720.cs@gmail.com</a></p>
       </article>
     </main>
   );
