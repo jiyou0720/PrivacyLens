@@ -20,6 +20,14 @@ def test_sensitive_mention_does_not_add_risk():
     assert findings and findings[0].score == 0
 
 
+def test_current_sensitive_data_without_confirmed_separate_consent_adds_risk():
+    findings = special(ExtractedConsent(collected_items=[item(
+        applies_to_current_function=True,
+        scope_evidence="현재 회원가입에서 장애 여부를 수집합니다.",
+    )]))
+    assert findings[0].score == 20
+
+
 def test_resume_only_data_is_not_signup_risk():
     assert not special(ExtractedConsent(collected_items=[item(
         collection_context="이력서", applies_to_current_function=False,

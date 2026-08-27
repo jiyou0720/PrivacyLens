@@ -14,7 +14,7 @@ type Analysis = {
   service_name: string;
   extracted: { collected_items: Array<{ original_name: string; normalized_name: string; collection_context?: string; applies_to_current_function?: boolean | null }> };
   findings: Array<{ rule_id: string; legal_bases: Array<{ law_name: string; article: string; title: string; rationale: string; source_url: string }> }>;
-  risk_summary: { score: number; level: string; explanation: string };
+  risk_summary: { score: number; level: string; explanation: string; requires_human_review?: boolean };
 };
 
 type DocumentStatus = { url: string; state: "success" | "partial" | "permission" | "http" | "format" | "empty" | "failed"; message: string };
@@ -215,7 +215,7 @@ function App() {
       <h2>{result.page.domain}</h2>
       {coverage && <p className="coverage">{coverage}</p>}
       {documentStatuses.length > 0 && <div className="documentStatuses">{documentStatuses.map((document) => <div key={document.url} className={document.state === "success" ? "documentOk" : "documentFail"}><strong>{document.message}</strong><span title={document.url}>{new URL(document.url).hostname}</span></div>)}</div>}
-      {analysis && incomplete ? <div className="risk insufficient"><strong>분석 불충분</strong><p>원문 수집 실패 또는 길이·문서 수 제한으로 일부 내용이 빠져 위험 점수와 등급을 표시하지 않습니다.</p></div> : analysis && <div className="risk"><strong>{riskLabel(analysis.risk_summary.level)}</strong><span>규칙 기반 위험 점수 {analysis.risk_summary.score}</span><p>{analysis.risk_summary.explanation}</p></div>}
+      {analysis && incomplete ? <div className="risk insufficient"><strong>분석 불충분</strong><p>원문 수집 실패 또는 길이·문서 수 제한으로 일부 내용이 빠져 위험 점수와 등급을 표시하지 않습니다.</p></div> : analysis && <div className="risk"><strong>{analysis.risk_summary.requires_human_review && analysis.risk_summary.score === 0 ? "검토 필요" : riskLabel(analysis.risk_summary.level)}</strong><span>규칙 기반 위험 점수 {analysis.risk_summary.score}</span><p>{analysis.risk_summary.explanation}</p></div>}
       <label>탐지된 개인정보 필드</label><div className="chips">{detectedFields.size ? Array.from(detectedFields.entries()).map(([key, text]) => <span key={key}>{text}</span>) : <em>탐지된 항목 없음</em>}</div>
       <label>동의 항목</label><p>{result.consents.length}개 탐지 · 기본 선택 경고 {result.warnings.length}건</p>
       {analysis && !incomplete && analysis.findings.some((finding) => finding.legal_bases.length) && <><label>관련 법령 근거</label><div className="legalBases">{analysis.findings.flatMap((finding) => finding.legal_bases.map((basis) => <a key={`${finding.rule_id}-${basis.law_name}-${basis.article}`} href={basis.source_url} target="_blank" rel="noreferrer"><strong>{basis.law_name} {basis.article}</strong><span>{basis.title}</span><p><b>핵심 요약</b> {basis.rationale}</p><em>해당 조문 원문 보기 →</em></a>))}</div></>}
