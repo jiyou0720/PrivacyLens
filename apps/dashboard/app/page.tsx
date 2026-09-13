@@ -8,7 +8,7 @@ import { ExportRecordsButton, RecordDetails } from "./RecordActions";
 
 const sourceLabel = { detected: "화면에서 탐지", user_confirmed: "사용자 확인", policy_stated: "처리방침 명시" };
 type AnalysisRecord = ServiceRecord & { riskLevel: string; requiresReview: boolean; result: ExtensionResult };
-const riskLabel = (level: string) => level === "LOW" ? "확인된 위험 낮음" : level;
+const riskLabel = (level: string) => level === "LOW" ? "확인 완료" : level === "MEDIUM" ? "한 번 더 확인" : level === "분석 불충분" ? "일부 확인 필요" : "주의 필요";
 
 export default function Home() {
   const [records, setRecords] = useState<AnalysisRecord[]>([]);
@@ -64,7 +64,7 @@ export default function Home() {
       <section className="stats" aria-label="요약">
         <article><span>기록된 서비스</span><strong>{records.length}</strong><small>개</small></article>
         <article><span>제공 정보 유형</span><strong>{dataTypeCount}</strong><small>개</small></article>
-        <article><span>확인 필요 항목</span><strong className="accent">{reviewCount}</strong><small>건</small></article>
+        <article><span>한 번 더 볼 서비스</span><strong className="accent">{reviewCount}</strong><small>개</small></article>
       </section>
       {importError && <aside className="notice" role="alert">{importError}</aside>}
       <ConsentAnalysisPanel onAnalyzed={addRecord} selected={selected} />

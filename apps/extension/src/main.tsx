@@ -1,14 +1,15 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { PageScanResult } from "@privacylens/contracts";
-import { requestPageScan } from "./messaging";
+import { minimizeOptionalConsents, requestPageScan } from "./messaging";
 import { budgetDocuments } from "./documentBudget";
 import { fieldLabels } from "./fieldLabels";
 import { openWebResult } from "./webResult";
 import "./styles.css";
 
 const WEB_SERVICE_URL = "https://privacylens.site";
-const riskLabel = (level: string) => level === "LOW" ? "확인된 위험 낮음" : level;
+const statusLabel = (level: string) => level === "LOW" ? "기본 정보만 확인됐어요" : level === "MEDIUM" ? "한 번 더 확인하세요" : "주의해서 확인하세요";
+const statusMessage = (level: string) => level === "LOW" ? "이 사이트가 가져가는 정보를 확인해 보세요." : level === "MEDIUM" ? "선택 정보나 추가 확인이 필요한 항목이 있어요." : "민감하거나 꼭 확인해야 할 정보가 포함되어 있어요.";
 
 type Analysis = {
   service_name: string;
@@ -19,7 +20,7 @@ type Analysis = {
 };
 
 type DocumentStatus = { url: string; state: "success" | "partial" | "permission" | "http" | "format" | "empty" | "failed"; message: string };
-type SavedView = { result: PageScanResult; analysis: Analysis | null; error: string; coverage: string; incomplete: boolean; documentStatuses: DocumentStatus[] };
+type SavedView = { result: PageScanResult; analysis: Analysis | null; error: string; coverage: string; incomplete: boolean; documentStatuses: DocumentStatus[]; minimizedCount?: number };
 let restoreStarted = false;
 
 async function readLinkedDocuments(urls: string[], pageUrl: string): Promise<{ texts: Array<{ url: string; text: string }>; attempted: number; statuses: DocumentStatus[] }> {
@@ -104,17 +105,18 @@ function App() {
   const [coverage, setCoverage] = useState("");
   const [incomplete, setIncomplete] = useState(false);
   const [documentStatuses, setDocumentStatuses] = useState<DocumentStatus[]>([]);
+  const [minimizedCount, setMinimizedCount] = useState(0);
 
   async function persistView(view: SavedView) {
     await chrome.storage.local.set({ lastView: view });
   }
 
-  async function processScan(scan: PageScanResult) {
+  async function processScan(scan: PageScanResult, minimized = 0) {
     setResult(scan);
     if (scan.analysisText.trim().length < 20) {
       const message = "분석할 개인정보 동의문이나 입력 항목을 찾지 못했습니다.";
       setError(message); setLoading(false);
-      await persistView({ result: scan, analysis: null, error: message, coverage: "", incomplete: true, documentStatuses: [] });
+      await persistView({ result: scan, analysis: null, error: message, coverage: "", incomplete: true, documentStatuses: [], minimizedCount: minimized });
       return;
     }
 
@@ -136,7 +138,7 @@ function App() {
       if (linked.attempted > 0 && linked.texts.length === 0) {
         const message = "연결된 약관 원문을 읽지 못해 정확한 위험 점수를 계산할 수 없습니다. 분석 불충분 상태입니다.";
         setError(message);
-        await persistView({ result: scan, analysis: null, error: message, coverage: nextCoverage, incomplete: true, documentStatuses: linked.statuses });
+        await persistView({ result: scan, analysis: null, error: message, coverage: nextCoverage, incomplete: true, documentStatuses: linked.statuses, minimizedCount: minimized });
         await chrome.storage.local.remove("pendingScan");
         return;
       }
@@ -149,7 +151,7 @@ function App() {
       if (!apiResponse.ok) throw new Error(payload?.detail ?? `AI 분석 요청이 실패했습니다. (${apiResponse.status})`);
       const nextAnalysis = payload as Analysis;
       setAnalysis(nextAnalysis);
-      await persistView({ result: scan, analysis: nextAnalysis, error: "", coverage: nextCoverage, incomplete: nextIncomplete, documentStatuses: linked.statuses });
+      await persistView({ result: scan, analysis: nextAnalysis, error: "", coverage: nextCoverage, incomplete: nextIncomplete, documentStatuses: linked.statuses, minimizedCount: minimized });
       await chrome.storage.local.remove("pendingScan");
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "AI 분석 중 오류가 발생했습니다.";
@@ -161,7 +163,7 @@ function App() {
   }
 
   async function analyze() {
-    setError(""); setLoading(true); setAnalysis(null); setCoverage(""); setDocumentStatuses([]);
+    setError(""); setLoading(true); setAnalysis(null); setCoverage(""); setDocumentStatuses([]); setMinimizedCount(0);
     await chrome.storage.local.remove(["lastView", "pendingScan"]);
     const response = await requestPageScan();
     if (response.type === "PAGE_SCAN_FAILED") {
@@ -170,7 +172,11 @@ function App() {
     if (response.type !== "PAGE_SCAN_COMPLETED") {
       setError("페이지 분석 응답을 확인하지 못했습니다."); setLoading(false); return;
     }
-    await processScan(response.payload);
+    const minimized = response.payload.warnings.some((warning) => warning.ruleId === "preselected-optional-consent")
+      ? await minimizeOptionalConsents().catch(() => ({ count: 0, labels: [] }))
+      : { count: 0, labels: [] };
+    setMinimizedCount(minimized.count);
+    await processScan(response.payload, minimized.count);
   }
 
   useEffect(() => {
@@ -186,6 +192,7 @@ function App() {
       const saved = lastView as SavedView;
       setResult(saved.result); setAnalysis(saved.analysis); setError(saved.error);
       setCoverage(saved.coverage); setIncomplete(saved.incomplete); setDocumentStatuses(saved.documentStatuses ?? []);
+      setMinimizedCount(saved.minimizedCount ?? 0);
     });
   }, []);
 
@@ -215,11 +222,10 @@ function App() {
     {result && <div className={`result ${riskTone}`}>
       <h2>{result.page.domain}</h2>
       {coverage && <p className="coverage">{coverage}</p>}
-      {documentStatuses.length > 0 && <div className="documentStatuses">{documentStatuses.map((document) => <div key={document.url} className={document.state === "success" ? "documentOk" : "documentFail"}><strong>{document.message}</strong><span title={document.url}>{new URL(document.url).hostname}</span></div>)}</div>}
-      {analysis && incomplete ? <div className="risk insufficient"><strong>분석 불충분</strong><p>원문 수집 실패 또는 길이·문서 수 제한으로 일부 내용이 빠져 위험 점수와 등급을 표시하지 않습니다.</p></div> : analysis && <div className="risk"><strong>{riskLabel(analysis.risk_summary.level)}</strong><span>규칙 기반 위험 점수 {analysis.risk_summary.score}</span><p>{analysis.risk_summary.explanation}</p></div>}
-      <label>탐지된 개인정보 필드</label><div className="chips">{detectedFields.size ? Array.from(detectedFields.entries()).map(([key, text]) => <span key={key}>{text}</span>) : <em>탐지된 항목 없음</em>}</div>
-      <label>동의 항목</label><p>{result.consents.length}개 탐지 · 기본 선택 경고 {result.warnings.length}건</p>
-      {analysis && !incomplete && analysis.findings.some((finding) => finding.legal_bases.length) && <><label>관련 법령 근거</label><div className="legalBases">{analysis.findings.flatMap((finding) => finding.legal_bases.map((basis) => <a key={`${finding.rule_id}-${basis.law_name}-${basis.article}`} href={basis.source_url} target="_blank" rel="noreferrer"><strong>{basis.law_name} {basis.article}</strong><span>{basis.title}</span><p><b>핵심 요약</b> {basis.rationale}</p><em>해당 조문 원문 보기 →</em></a>))}</div></>}
+      {analysis && incomplete ? <div className="risk insufficient"><strong>일부 내용은 확인하지 못했어요</strong><p>현재 화면에서 확인된 정보만 보여드려요.</p></div> : analysis && <div className="risk"><strong>{statusLabel(analysis.risk_summary.level)}</strong><p>{statusMessage(analysis.risk_summary.level)}</p></div>}
+      <label>이 사이트가 가져가는 정보</label><div className="chips">{detectedFields.size ? Array.from(detectedFields.keys()).map((text) => <span key={text}>{text}</span>) : <em>확인된 정보 없음</em>}</div>
+      {minimizedCount > 0 && <div className="minimized"><strong>미리 선택된 선택 동의 {minimizedCount}개를 해제했어요</strong><span>필수 동의와 회원가입 버튼은 건드리지 않았어요.</span></div>}
+      <label>동의 항목</label><p>필수 {result.consents.filter((item) => item.requirement === "required").length}개 · 선택 {result.consents.filter((item) => item.requirement === "optional").length}개</p>
       <a className="webLink" href={WEB_SERVICE_URL} target="_blank" rel="noreferrer" onClick={showWebResult} aria-disabled={openingWeb}>{openingWeb ? "결과 전달 중…" : "웹서비스에서 자세히 보기"}</a>
       <footer>요청 ID {result.requestId.slice(0, 12)}…</footer>
     </div>}

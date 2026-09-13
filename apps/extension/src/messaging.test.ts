@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PageScanResult } from "@privacylens/contracts";
-import { requestPageScan } from "./messaging";
+import { minimizeOptionalConsents, requestPageScan } from "./messaging";
 
 const result: PageScanResult = {
   schemaVersion: "1.0", requestId: "request-ok", scannedAt: "2026-08-12T00:00:00.000Z",
@@ -44,5 +44,10 @@ describe("requestPageScan", () => {
       type: "PAGE_SCAN_FAILED", requestId: "request-failed",
       error: { code: "UNSUPPORTED_PAGE" },
     });
+  });
+
+  it("선택 동의 최소화 결과를 반환한다", async () => {
+    vi.mocked(chrome.scripting.executeScript).mockResolvedValueOnce([{ result: { count: 2, labels: ["마케팅", "위치정보"] } }] as never);
+    await expect(minimizeOptionalConsents()).resolves.toEqual({ count: 2, labels: ["마케팅", "위치정보"] });
   });
 });

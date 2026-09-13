@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { safeLegalUrl, type ExtensionResult } from "./extensionResult";
+import { type ExtensionResult } from "./extensionResult";
 
 export type Analysis = {
   service_name: string;
@@ -12,7 +12,8 @@ export type Analysis = {
 };
 
 type Props = { onAnalyzed: (analysis: Analysis) => void; selected?: ExtensionResult | null };
-const riskLabel = (level: string) => level === "LOW" ? "확인된 위험 낮음" : level;
+const statusLabel = (level: string) => level === "LOW" ? "기본 정보만 확인됐어요" : level === "MEDIUM" ? "한 번 더 확인하세요" : "주의해서 확인하세요";
+const statusMessage = (level: string) => level === "LOW" ? "아래 정보가 수집된다는 점을 알고 진행하세요." : level === "MEDIUM" ? "선택 정보나 추가 확인이 필요한 항목이 있어요." : "민감하거나 꼭 확인해야 할 정보가 포함되어 있어요.";
 
 export default function ConsentAnalysisPanel({ onAnalyzed, selected }: Props) {
   const [serviceName, setServiceName] = useState("");
@@ -79,12 +80,12 @@ export default function ConsentAnalysisPanel({ onAnalyzed, selected }: Props) {
       </form>
       {error && <aside className="notice" role="alert"><strong>분석 실패</strong><p>{error}</p></aside>}
       {analysis && <article className={`record analysisResult ${riskTone}`}>
-        <div className="recordHead"><div className="logo">{source?.incomplete ? "—" : analysis.risk_summary.score}</div><div><h3>{analysis.service_name}</h3><p className={`${riskTone}Level`}>{source?.incomplete ? "분석 불충분" : riskLabel(analysis.risk_summary.level)}</p></div></div>
-        <p>{source?.incomplete ? "수집하지 못한 내용이 있어 위험 점수와 등급을 표시하지 않습니다." : analysis.risk_summary.explanation}</p>
-        {source && <div className="resultItem"><strong>{source.domain} · 확장 분석 결과</strong><p>{source.coverage} · 재분석 없이 불러옴</p>{source.documentStatuses.map((document, index) => <p key={`${document.url}-${index}`}>{document.message} · {document.url}</p>)}</div>}
+        <div className="recordHead"><div className="logo">{source?.incomplete ? "?" : analysis.risk_summary.level === "LOW" ? "✓" : "!"}</div><div><h3>{analysis.service_name}</h3><p className={`${riskTone}Level`}>{source?.incomplete ? "일부 내용 확인 필요" : statusLabel(analysis.risk_summary.level)}</p></div></div>
+        <p>{source?.incomplete ? "현재 확인할 수 있는 정보만 보여드려요." : statusMessage(analysis.risk_summary.level)}</p>
+        {source && <div className="resultItem"><strong>{source.domain}에서 가져온 결과</strong><p>{source.coverage}</p></div>}
+        <strong className="simpleHeading">이 서비스가 가져가는 정보</strong>
         <div className="chips">{analysis.extracted.collected_items.map((item) => <span key={item.original_name}>{item.normalized_name}</span>)}</div>
-        {analysis.extracted.collected_items.map((item) => <div className="resultItem" key={`${item.original_name}-${item.evidence_text}`}><strong>{item.original_name}</strong><p>{item.reason}</p><small>근거: {item.evidence_text}</small></div>)}
-        {analysis.findings.map((finding) => <div className="resultItem" key={finding.rule_id}><strong>{finding.title}</strong><p>{finding.reason}</p><small>권장: {finding.recommendation}</small>{finding.legal_bases.map((basis) => <p key={`${finding.rule_id}-${basis.law_name}-${basis.article}`}><strong>{basis.law_name} {basis.article} · {basis.title}</strong><br /><small>핵심 요약: {basis.rationale}</small><br /><a href={safeLegalUrl(basis.source_url)} target="_blank" rel="noreferrer">해당 조문 원문 보기 →</a></p>)}</div>)}
+        {analysis.findings.length > 0 && <div className="simpleNotice"><strong>알아두세요</strong><ul>{analysis.findings.slice(0, 3).map((finding) => <li key={finding.rule_id}>{finding.title}</li>)}</ul></div>}
       </article>}
     </section>
   );
