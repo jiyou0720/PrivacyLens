@@ -34,6 +34,41 @@ export async function requestPageScan(requestId = createRequestId()): Promise<Ex
   }
 }
 
+export async function minimizeOptionalConsents(): Promise<{ count: number; labels: string[] }> {
+  const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  const tab = tabs[0];
+  if (!tab?.id || !tab.url || !supportedProtocols.has(new URL(tab.url).protocol)) return { count: 0, labels: [] };
+  const [{ result }] = await chrome.scripting.executeScript<[], { count: number; labels: string[] }>({
+    target: { tabId: tab.id },
+    func: () => {
+      const compact = (value: string | null | undefined) => (value ?? "").replace(/\s+/g, " ").trim();
+      const isOptional = (text: string) => /(^|[\s[(])선택([\s)\]]|$)|optional/i.test(text);
+      const isAll = (text: string) => /전체\s*동의|모두\s*동의|agree.?all/i.test(text);
+      const labels: string[] = [];
+      for (const input of Array.from(document.querySelectorAll<HTMLInputElement>("input[type='checkbox']"))) {
+        const container = input.closest("label, li, [role='group'], fieldset, div");
+        const text = compact([input.labels ? Array.from(input.labels).map((label) => label.textContent).join(" ") : "", input.getAttribute("aria-label"), container?.textContent].join(" "));
+        if (!input.checked || input.disabled || !isOptional(text) || isAll(text)) continue;
+        const checkedSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "checked")?.set;
+        if (checkedSetter) checkedSetter.call(input, false);
+        else input.checked = false;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+        labels.push(text.slice(0, 80) || "선택 동의");
+      }
+      for (const element of Array.from(document.querySelectorAll<HTMLElement>("[role='checkbox'][aria-checked='true']"))) {
+        const container = element.closest("label, li, [role='group'], div");
+        const text = compact([element.getAttribute("aria-label"), container?.textContent].join(" "));
+        if (element.getAttribute("aria-disabled") === "true" || !isOptional(text) || isAll(text)) continue;
+        element.click();
+        labels.push(text.slice(0, 80) || "선택 동의");
+      }
+      return { count: labels.length, labels };
+    },
+  });
+  return result ?? { count: 0, labels: [] };
+}
+
 async function failure(requestId: string, code: ScanErrorCode, message: string): Promise<ExtensionMessage> {
   const failed: ExtensionMessage = { type: "PAGE_SCAN_FAILED", requestId, error: { code, message } };
   await chrome.runtime.sendMessage(failed).catch(() => undefined);
